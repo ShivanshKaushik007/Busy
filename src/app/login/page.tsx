@@ -50,12 +50,21 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           </CardContent>
           <CardFooter className="flex flex-col gap-2">
             {/* formaction allows multiple buttons to trigger different server actions */}
-            <Button className="w-full" formAction={login}>
+            {/* Using native button to ensure formAction works properly with Next.js */}
+            <button 
+              type="submit" 
+              formAction={login}
+              className="group/button inline-flex h-8 shrink-0 items-center justify-center rounded-lg border border-transparent bg-primary px-2.5 text-sm font-medium text-primary-foreground whitespace-nowrap transition-all outline-none select-none hover:bg-primary/80 w-full"
+            >
               Sign In
-            </Button>
-            <Button variant="outline" className="w-full" formAction={signup}>
+            </button>
+            <button 
+              type="submit" 
+              formAction={signup}
+              className="group/button inline-flex h-8 shrink-0 items-center justify-center rounded-lg border border-border bg-background px-2.5 text-sm font-medium hover:bg-muted hover:text-foreground whitespace-nowrap transition-all outline-none select-none w-full"
+            >
               Sign Up
-            </Button>
+            </button>
           </CardFooter>
         </form>
       </Card>
