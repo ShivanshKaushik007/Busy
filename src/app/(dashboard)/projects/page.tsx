@@ -11,6 +11,7 @@ export default async function ProjectsPage() {
     .from('projects')
     .select(`
       *,
+      profiles!projects_owner_id_fkey ( id, full_name, email ),
       project_members ( user_id ),
       tasks ( id )
     `)

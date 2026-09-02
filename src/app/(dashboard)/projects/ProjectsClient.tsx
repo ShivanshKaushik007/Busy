@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
   FolderKanban, Plus, Archive, ArchiveRestore, 
-  Users, CheckCircle2, AlertCircle, Loader2, KeyRound 
+  Users, CheckCircle2, AlertCircle, Loader2, Edit, UserCheck 
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,7 +21,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { createProject, toggleArchiveProject, updateProjectMembers } from '@/app/actions/projectActions'
+import { createProject, toggleArchiveProject, updateProjectMembers, updateProject } from '@/app/actions/projectActions'
 
 interface ProjectsClientProps {
   initialProjects: any[]
@@ -31,7 +31,6 @@ interface ProjectsClientProps {
 
 export default function ProjectsClient({ initialProjects, isManager, allProfiles }: ProjectsClientProps) {
   const router = useRouter()
-  const [projects, setProjects] = useState(initialProjects)
   const [showArchived, setShowArchived] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   
@@ -39,9 +38,17 @@ export default function ProjectsClient({ initialProjects, isManager, allProfiles
   const [key, setKey] = useState('')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [ownerId, setOwnerId] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+
+  // Edit Project Modal (Requirement 2: "and can edit them later")
+  const [editModalProject, setEditModalProject] = useState<any | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [editOwnerId, setEditOwnerId] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
 
   // Members modal
   const [membersModalProject, setMembersModalProject] = useState<any | null>(null)
@@ -54,6 +61,7 @@ export default function ProjectsClient({ initialProjects, isManager, allProfiles
     router.refresh()
   }
 
+  // 1. Create Project
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!key.trim() || !name.trim()) {
@@ -67,7 +75,8 @@ export default function ProjectsClient({ initialProjects, isManager, allProfiles
     const res = await createProject({
       key: key.trim().toUpperCase(),
       name: name.trim(),
-      description: description.trim() || undefined
+      description: description.trim() || undefined,
+      ownerId: ownerId || undefined
     })
 
     setLoading(false)
@@ -78,11 +87,46 @@ export default function ProjectsClient({ initialProjects, isManager, allProfiles
       setKey('')
       setName('')
       setDescription('')
+      setOwnerId('')
       setCreateOpen(false)
       showFeedback('Project created successfully!')
     }
   }
 
+  // 2. Open Edit Project Modal
+  const openEditModal = (proj: any) => {
+    setEditModalProject(proj)
+    setEditName(proj.name || '')
+    setEditDescription(proj.description || '')
+    setEditOwnerId(proj.owner_id || '')
+  }
+
+  // 3. Save Project Edits
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editModalProject) return
+    if (!editName.trim()) {
+      alert('Project name is required.')
+      return
+    }
+
+    setSavingEdit(true)
+    const res = await updateProject(editModalProject.id, {
+      name: editName.trim(),
+      description: editDescription.trim(),
+      ownerId: editOwnerId || undefined
+    })
+    setSavingEdit(false)
+
+    if (res.error) {
+      alert(res.error)
+    } else {
+      setEditModalProject(null)
+      showFeedback('Project details updated!')
+    }
+  }
+
+  // 4. Archive / Restore Toggle
   const handleArchiveToggle = async (projectId: string, currentArchived: boolean) => {
     const res = await toggleArchiveProject(projectId, !currentArchived)
     if (res.error) {
@@ -92,6 +136,7 @@ export default function ProjectsClient({ initialProjects, isManager, allProfiles
     }
   }
 
+  // 5. Members Modal
   const openMembersModal = (proj: any) => {
     setMembersModalProject(proj)
     const currentIds = (proj.project_members || []).map((m: any) => m.user_id)
@@ -125,7 +170,7 @@ export default function ProjectsClient({ initialProjects, isManager, allProfiles
           </nav>
           <h2 className="text-2xl font-bold tracking-tight text-gray-900">Projects Portfolio</h2>
           <p className="text-sm text-gray-500">
-            {isManager ? 'Manage software projects, team access, and archiving.' : 'Projects you are an active member of.'}
+            {isManager ? 'Manage software projects, owners, team access, and archiving.' : 'Projects you are an active member of.'}
           </p>
         </div>
 
@@ -190,10 +235,19 @@ export default function ProjectsClient({ initialProjects, isManager, allProfiles
                     {proj.tasks?.length || 0} issues
                   </span>
                 </div>
+                
                 <CardTitle className="text-lg font-bold text-gray-900 pt-2">{proj.name}</CardTitle>
+                
                 <CardDescription className="line-clamp-2 text-xs">
                   {proj.description || 'No description provided.'}
                 </CardDescription>
+
+                {/* Owner details */}
+                <div className="pt-2 flex items-center gap-1.5 text-xs text-gray-600">
+                  <UserCheck className="h-3.5 w-3.5 text-primary" />
+                  <span className="font-medium">Owner:</span>
+                  <span>{proj.profiles?.full_name || proj.profiles?.email || 'Unassigned'}</span>
+                </div>
               </CardHeader>
 
               <CardContent className="pt-0 border-t border-gray-100 mt-3 pt-3 flex items-center justify-between">
@@ -202,10 +256,10 @@ export default function ProjectsClient({ initialProjects, isManager, allProfiles
                   <span>{proj.project_members?.length || 0} members</span>
                 </div>
 
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1">
                   <Link href={`/tasks?project=${proj.id}`}>
-                    <Button variant="ghost" size="sm" className="h-7 text-xs text-primary font-medium">
-                      View Tasks
+                    <Button variant="ghost" size="sm" className="h-7 text-xs text-primary font-medium px-2">
+                      Tasks
                     </Button>
                   </Link>
 
@@ -214,7 +268,16 @@ export default function ProjectsClient({ initialProjects, isManager, allProfiles
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-7 text-xs"
+                        className="h-7 text-xs px-2 gap-1"
+                        onClick={() => openEditModal(proj)}
+                        title="Edit Project"
+                      >
+                        <Edit className="h-3.5 w-3.5" /> Edit
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs px-2"
                         onClick={() => openMembersModal(proj)}
                       >
                         Team
@@ -222,7 +285,7 @@ export default function ProjectsClient({ initialProjects, isManager, allProfiles
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-7 text-xs text-gray-500 hover:text-red-600"
+                        className="h-7 text-xs px-2 text-gray-500 hover:text-red-600"
                         onClick={() => handleArchiveToggle(proj.id, proj.is_archived)}
                       >
                         {proj.is_archived ? 'Restore' : 'Archive'}
@@ -236,13 +299,13 @@ export default function ProjectsClient({ initialProjects, isManager, allProfiles
         </div>
       )}
 
-      {/* Create Project Modal (Managers Only) */}
+      {/* Create Project Modal (Requirement 2: "short key, a name, a description and an owner") */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create New Project</DialogTitle>
             <DialogDescription>
-              Managers create projects with a short key, a name, and description.
+              Managers create projects with a short key, a name, a description, and an assigned owner.
             </DialogDescription>
           </DialogHeader>
 
@@ -279,6 +342,23 @@ export default function ProjectsClient({ initialProjects, isManager, allProfiles
             </div>
 
             <div className="space-y-1.5">
+              <Label htmlFor="proj-owner">Project Owner</Label>
+              <select
+                id="proj-owner"
+                value={ownerId}
+                onChange={(e) => setOwnerId(e.target.value)}
+                className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="">Default (You)</option>
+                {allProfiles.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.full_name || p.email} ({p.role})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
               <Label htmlFor="proj-desc">Description</Label>
               <Textarea
                 id="proj-desc"
@@ -295,6 +375,66 @@ export default function ProjectsClient({ initialProjects, isManager, allProfiles
               </Button>
               <Button type="submit" disabled={loading} className="bg-primary text-primary-foreground">
                 {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Create Project
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Project Modal (Requirement 2: "and can edit them later") */}
+      <Dialog open={!!editModalProject} onOpenChange={(open) => { if (!open) setEditModalProject(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Project Details</DialogTitle>
+            <DialogDescription>
+              Update name, description, or project owner for <strong>[{editModalProject?.key}]</strong>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSaveEdit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-name">Project Name <span className="text-red-500">*</span></Label>
+              <Input
+                id="edit-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-owner">Project Owner</Label>
+              <select
+                id="edit-owner"
+                value={editOwnerId}
+                onChange={(e) => setEditOwnerId(e.target.value)}
+                className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="">Unassigned</option>
+                {allProfiles.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.full_name || p.email} ({p.role})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-desc">Description</Label>
+              <Textarea
+                id="edit-desc"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                rows={3}
+              />
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditModalProject(null)} disabled={savingEdit}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={savingEdit} className="bg-primary text-primary-foreground">
+                {savingEdit ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Save Changes
               </Button>
             </DialogFooter>
           </form>

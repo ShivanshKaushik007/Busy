@@ -6,7 +6,8 @@ import { TaskPriority, TaskStatus } from '@/lib/types'
 import { verifyManagerRole } from './projectActions'
 
 // 0. Fetch projects available to the current user
-export async function getUserProjects() {
+// "Archiving hides a project from the default views without destroying its data or its tasks."
+export async function getUserProjects(includeArchived: boolean = false) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return []
@@ -14,21 +15,30 @@ export async function getUserProjects() {
   const { isManager } = await verifyManagerRole()
 
   if (isManager) {
-    // Managers can see all unarchived projects
-    const { data: projects } = await supabase
+    let query = supabase
       .from('projects')
-      .select('id, name, key, is_archived')
+      .select('id, name, key, is_archived, owner_id')
       .order('name')
+    
+    if (!includeArchived) {
+      query = query.eq('is_archived', false)
+    }
+
+    const { data: projects } = await query
     return projects || []
   }
 
-  // Members only see projects they belong to
-  const { data: memberships } = await supabase
+  // Members only see active projects they belong to
+  let query = supabase
     .from('project_members')
-    .select('projects!inner(id, name, key, is_archived)')
+    .select('projects!inner(id, name, key, is_archived, owner_id)')
     .eq('user_id', user.id)
-    .eq('projects.is_archived', false)
 
+  if (!includeArchived) {
+    query = query.eq('projects.is_archived', false)
+  }
+
+  const { data: memberships } = await query
   return (memberships || []).map((m: any) => m.projects)
 }
 
