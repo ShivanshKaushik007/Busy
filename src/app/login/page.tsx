@@ -22,7 +22,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         {/* We use standard HTML forms mapped to Next.js server actions */}
         <form>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
@@ -32,7 +32,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
                 required
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
@@ -41,10 +41,35 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
                 required
               />
             </div>
+
+            {/* Optional for sign in, used for sign up */}
+            <div className="border-t pt-3 space-y-3">
+              <p className="text-xs text-muted-foreground font-medium">For new account registration:</p>
+              <div className="space-y-1.5">
+                <Label htmlFor="fullName">Full Name</Label>
+                <Input
+                  id="fullName"
+                  name="fullName"
+                  placeholder="Jane Doe"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="role">Role</Label>
+                <select
+                  id="role"
+                  name="role"
+                  defaultValue="member"
+                  className="w-full h-8 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="member">Regular Member (can only see assigned projects)</option>
+                  <option value="manager">Manager (can create/archive projects, delete tasks)</option>
+                </select>
+              </div>
+            </div>
             
             {/* Display error message if present */}
             {error && (
-              <p className="text-sm text-destructive">{error}</p>
+              <p className="text-sm text-destructive font-medium">{error}</p>
             )}
             
           </CardContent>

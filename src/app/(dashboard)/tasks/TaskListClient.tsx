@@ -13,7 +13,13 @@ import { TaskStatus } from '@/lib/types'
 import TaskDetailModal from '@/components/TaskDetailModal'
 import CreateTaskDialog from '@/components/CreateTaskDialog'
 
-export default function TaskListClient({ initialTasks, totalCount, currentPage, currentSort }: any) {
+export default function TaskListClient({ 
+  initialTasks, 
+  totalCount, 
+  currentPage, 
+  currentSort,
+  projects = []
+}: any) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -103,8 +109,8 @@ export default function TaskListClient({ initialTasks, totalCount, currentPage, 
       
       {/* Toolbar Area */}
       <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-gray-50/50">
-        <div className="flex items-center gap-2 flex-1 w-full max-w-md">
-          <div className="relative flex-1">
+        <div className="flex flex-wrap items-center gap-2 flex-1 w-full max-w-2xl">
+          <div className="relative flex-1 min-w-[180px]">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
             <Input 
               placeholder="Search issues..." 
@@ -114,7 +120,19 @@ export default function TaskListClient({ initialTasks, totalCount, currentPage, 
             />
           </div>
           
-          {/* Quick Filters */}
+          {/* Project Filter */}
+          <select 
+            className="h-9 border border-gray-300 rounded-md bg-white px-3 text-sm text-gray-700"
+            value={searchParams.get('project') || ''}
+            onChange={(e) => updateFilter('project', e.target.value)}
+          >
+            <option value="">All Projects</option>
+            {projects.map((p: any) => (
+              <option key={p.id} value={p.id}>[{p.key}] {p.name}</option>
+            ))}
+          </select>
+
+          {/* Status Filter */}
           <select 
             className="h-9 border border-gray-300 rounded-md bg-white px-3 text-sm text-gray-700"
             value={searchParams.get('status') || ''}

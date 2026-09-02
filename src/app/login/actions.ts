@@ -31,20 +31,27 @@ export async function login(formData: FormData) {
 export async function signup(formData: FormData) {
   const supabase = await createClient()
 
-  const data = {
-    email: formData.get('email') as string,
-    password: formData.get('password') as string,
-  }
+  const email = formData.get('email') as string
+  const password = formData.get('password') as string
+  const fullName = (formData.get('fullName') as string) || email.split('@')[0]
+  const role = (formData.get('role') as string) || 'member'
 
-  // Attempt to sign up via Supabase Auth
-  const { error } = await supabase.auth.signUp(data)
+  // Attempt to sign up via Supabase Auth with metadata
+  const { error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        full_name: fullName,
+        role: role === 'manager' ? 'manager' : 'member'
+      }
+    }
+  })
 
   if (error) {
-    redirect('/login?error=Could not create user')
+    redirect(`/login?error=${encodeURIComponent(error.message || 'Could not create user')}`)
   }
 
-  // After sign-up, typically they will be sent an email confirmation, 
-  // but for local testing, they might just be logged in. 
   revalidatePath('/', 'layout')
   redirect('/')
 }

@@ -1,6 +1,8 @@
 import { createClient } from '@/utils/supabase/server'
 import TaskListClient from './TaskListClient'
 import { Task, TaskPriority, TaskStatus } from '@/lib/types'
+import { verifyManagerRole } from '@/app/actions/projectActions'
+import { getUserProjects } from '@/app/actions/taskActions'
 
 export default async function TasksPage({ 
   searchParams 
@@ -9,14 +11,20 @@ export default async function TasksPage({
 }) {
   const supabase = await createClient()
   const params = await searchParams
+  const { isManager, user } = await verifyManagerRole()
 
   // Parse search params
   const query = typeof params.q === 'string' ? params.q : ''
   const status = typeof params.status === 'string' ? params.status : ''
   const priority = typeof params.priority === 'string' ? params.priority : ''
+  const projectParam = typeof params.project === 'string' ? params.project : ''
   const overdue = params.overdue === 'true'
   const sort = typeof params.sort === 'string' ? params.sort : 'updated_at' // default sort
   
+  // Available projects for the viewer
+  const availableProjects = await getUserProjects()
+  const allowedProjectIds = availableProjects.map(p => p.id)
+
   // Pagination
   const page = typeof params.page === 'string' ? parseInt(params.page) : 1
   const limit = 10
@@ -28,9 +36,23 @@ export default async function TasksPage({
     .from('tasks')
     .select(`
       *,
-      projects ( name, key ),
+      projects ( id, name, key ),
       task_assignments ( user_id )
     `, { count: 'exact' }) // Request total count for pagination!
+
+  // SERVER-SIDE ROLE ISOLATION (Requirement 1 & 6)
+  // "Members can do neither, and only see projects they belong to."
+  if (!isManager) {
+    supabaseQuery = supabaseQuery.in(
+      'project_id', 
+      allowedProjectIds.length > 0 ? allowedProjectIds : ['00000000-0000-0000-0000-000000000000']
+    )
+  }
+
+  // Filter by specific project if selected
+  if (projectParam) {
+    supabaseQuery = supabaseQuery.eq('project_id', projectParam)
+  }
 
   // Apply Text Search (Titles and Descriptions)
   if (query) {
@@ -88,6 +110,7 @@ export default async function TasksPage({
         totalCount={count || 0}
         currentPage={page}
         currentSort={sort}
+        projects={availableProjects}
       />
     </div>
   )

@@ -1,12 +1,24 @@
 import { createClient } from '@/utils/supabase/server'
 import DashboardCharts from '@/components/DashboardCharts'
+import { verifyManagerRole } from '@/app/actions/projectActions'
+import { getUserProjects } from '@/app/actions/taskActions'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
+  const { isManager } = await verifyManagerRole()
+  const availableProjects = await getUserProjects()
+  const allowedProjectIds = availableProjects.map(p => p.id)
 
-  // In a real app, you would fetch tasks for projects the user belongs to.
-  // For the assignment, we'll fetch all tasks to demonstrate the dashboard metrics.
-  const { data: tasks } = await supabase.from('tasks').select('*')
+  // Fetch tasks strictly according to role and project membership (Requirement 1 & 8)
+  let tasksQuery = supabase.from('tasks').select('*')
+  if (!isManager) {
+    tasksQuery = tasksQuery.in(
+      'project_id',
+      allowedProjectIds.length > 0 ? allowedProjectIds : ['00000000-0000-0000-0000-000000000000']
+    )
+  }
+
+  const { data: tasks } = await tasksQuery
   
   // Calculate metrics based on the data
   const metrics = {
