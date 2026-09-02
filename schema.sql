@@ -104,3 +104,15 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+-- DISMISSED ALERTS TABLE
+-- Tracks which overdue task alerts a user has dismissed.
+-- By storing the dismissed_due_date, the alert automatically comes back if the due date changes!
+CREATE TABLE dismissed_alerts (
+    user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+    task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
+    dismissed_due_date TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    PRIMARY KEY (user_id, task_id)
+);
+

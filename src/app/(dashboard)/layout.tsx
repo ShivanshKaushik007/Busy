@@ -1,11 +1,47 @@
 import { ReactNode } from 'react'
 import Link from 'next/link'
-import { LayoutDashboard, CheckSquare, ListTodo, Users, LogOut, Search, Bell, HelpCircle, Plus, ChevronDown, Settings, KanbanSquare, Clock } from 'lucide-react'
+import { LayoutDashboard, CheckSquare, ListTodo, Users, Search, HelpCircle, ChevronDown, Settings, KanbanSquare } from 'lucide-react'
 import { logout } from '@/app/login/actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import OverdueAlerts, { OverdueAlert } from '@/components/OverdueAlerts'
+import { createClient } from '@/utils/supabase/server'
 
-export default function DashboardLayout({ children }: { children: ReactNode }) {
+export default async function DashboardLayout({ children }: { children: ReactNode }) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  let alerts: OverdueAlert[] = []
+
+  if (user) {
+    // 1. Fetch overdue tasks assigned to this user
+    const { data: assignedTasks } = await supabase
+      .from('task_assignments')
+      .select('task_id, tasks!inner(id, title, due_date, status)')
+      .eq('user_id', user.id)
+      .neq('tasks.status', 'Done')
+      .lt('tasks.due_date', new Date().toISOString())
+
+    // 2. Fetch the user's dismissed alerts to filter them out
+    const { data: dismissed } = await supabase
+      .from('dismissed_alerts')
+      .select('task_id, dismissed_due_date')
+      .eq('user_id', user.id)
+
+    // 3. Filter out tasks where the current due_date matches the dismissed_due_date
+    if (assignedTasks) {
+      alerts = assignedTasks
+        .map((a: any) => a.tasks)
+        .filter((task: any) => {
+          const isDismissed = dismissed?.some(d => 
+            d.task_id === task.id && 
+            new Date(d.dismissed_due_date).getTime() === new Date(task.due_date).getTime()
+          )
+          return !isDismissed
+        })
+    }
+  }
+
   return (
     <div className="flex flex-col h-screen bg-gray-50 dark:bg-zinc-950 font-sans">
       
@@ -48,9 +84,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             />
           </div>
           <div className="flex items-center gap-2 text-gray-500">
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-gray-100">
-              <Bell className="h-5 w-5" />
-            </Button>
+            
+            {/* Server-fetched Alerts passed to interactive Client Component */}
+            <OverdueAlerts initialAlerts={alerts} />
+            
             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-gray-100">
               <HelpCircle className="h-5 w-5" />
             </Button>
