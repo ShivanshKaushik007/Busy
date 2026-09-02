@@ -36,7 +36,7 @@ export default function OverdueAlerts({ initialAlerts }: { initialAlerts: Overdu
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-gray-100 relative" />}>
+      <DropdownMenuTrigger className="relative flex items-center justify-center h-8 w-8 rounded-full hover:bg-gray-100 text-gray-500 cursor-pointer outline-none">
         <Bell className="h-5 w-5" />
         {alerts.length > 0 && (
           <span className="absolute top-0 right-0 h-4 w-4 rounded-full bg-red-600 flex items-center justify-center text-[10px] font-bold text-white shadow-sm ring-2 ring-white border border-red-700">

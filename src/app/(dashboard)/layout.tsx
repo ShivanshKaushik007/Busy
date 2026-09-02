@@ -5,6 +5,7 @@ import { logout } from '@/app/login/actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import OverdueAlerts, { OverdueAlert } from '@/components/OverdueAlerts'
+import CreateTaskDialog from '@/components/CreateTaskDialog'
 import { createClient } from '@/utils/supabase/server'
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
@@ -58,18 +59,18 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
           {/* Top Nav Links */}
           <nav className="hidden md:flex items-center h-full space-x-1">
-            <Button variant="ghost" className="text-gray-600 hover:text-primary font-medium h-9 px-3 flex gap-1">
-              Your work <ChevronDown className="h-4 w-4 opacity-50" />
-            </Button>
-            <Button variant="ghost" className="text-gray-600 hover:text-primary font-medium h-9 px-3 flex gap-1">
-              Projects <ChevronDown className="h-4 w-4 opacity-50" />
-            </Button>
-            <Button variant="ghost" className="text-gray-600 hover:text-primary font-medium h-9 px-3 flex gap-1">
-              Dashboards <ChevronDown className="h-4 w-4 opacity-50" />
-            </Button>
-            <Button className="ml-2 h-8 px-3 bg-primary text-primary-foreground hover:bg-primary/90 font-medium">
-              Create
-            </Button>
+            <Link href="/" className="px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-primary rounded hover:bg-gray-100 transition-colors">
+              Dashboard
+            </Link>
+            <Link href="/tasks" className="px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-primary rounded hover:bg-gray-100 transition-colors">
+              Issues
+            </Link>
+            <Link href="/projects" className="px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-primary rounded hover:bg-gray-100 transition-colors">
+              Projects
+            </Link>
+            <div className="ml-2">
+              <CreateTaskDialog />
+            </div>
           </nav>
         </div>
 

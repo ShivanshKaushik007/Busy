@@ -7,9 +7,11 @@ import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
-import { Search, Download, ChevronLeft, ChevronRight, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { Search, Download, ChevronLeft, ChevronRight, AlertCircle, CheckCircle2, Plus } from 'lucide-react'
 import { bulkUpdateStatus, BulkUpdateResult } from '@/app/actions/bulkActions'
 import { TaskStatus } from '@/lib/types'
+import TaskDetailModal from '@/components/TaskDetailModal'
+import CreateTaskDialog from '@/components/CreateTaskDialog'
 
 export default function TaskListClient({ initialTasks, totalCount, currentPage, currentSort }: any) {
   const router = useRouter()
@@ -19,6 +21,7 @@ export default function TaskListClient({ initialTasks, totalCount, currentPage, 
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set())
   const [isUpdating, setIsUpdating] = useState(false)
   const [bulkResults, setBulkResults] = useState<BulkUpdateResult[]>([])
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
 
   // Helper to update URL params which triggers a server-side refetch!
   const updateFilter = (key: string, value: string) => {
@@ -129,9 +132,12 @@ export default function TaskListClient({ initialTasks, totalCount, currentPage, 
           </Button>
         </div>
 
-        <Button variant="outline" size="sm" className="h-9 gap-2" onClick={exportCSV}>
-          <Download className="h-4 w-4" /> Export CSV
-        </Button>
+        <div className="flex items-center gap-2">
+          <CreateTaskDialog />
+          <Button variant="outline" size="sm" className="h-9 gap-2" onClick={exportCSV}>
+            <Download className="h-4 w-4" /> Export CSV
+          </Button>
+        </div>
       </div>
 
       {/* Bulk Actions Bar (Appears when rows are selected) */}
@@ -213,7 +219,13 @@ export default function TaskListClient({ initialTasks, totalCount, currentPage, 
                   />
                 </TableCell>
                 <TableCell className="font-medium text-gray-900">
-                  {task.title}
+                  <button
+                    type="button"
+                    onClick={() => setActiveTaskId(task.id)}
+                    className="text-left font-semibold text-primary hover:underline flex items-center cursor-pointer"
+                  >
+                    {task.title}
+                  </button>
                   {task.is_blocked && (
                     <Badge variant="destructive" className="ml-2 text-[10px] h-5">BLOCKED</Badge>
                   )}
@@ -257,6 +269,13 @@ export default function TaskListClient({ initialTasks, totalCount, currentPage, 
           </Button>
         </div>
       </div>
+
+      {/* Interactive Task Detail Modal */}
+      <TaskDetailModal 
+        taskId={activeTaskId} 
+        onClose={() => setActiveTaskId(null)} 
+        onTaskUpdated={() => router.refresh()} 
+      />
     </div>
   )
 }
