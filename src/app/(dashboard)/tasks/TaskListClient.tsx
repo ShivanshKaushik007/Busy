@@ -7,8 +7,8 @@ import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
-import { Search, Download, ChevronLeft, ChevronRight, AlertCircle, CheckCircle2, Plus } from 'lucide-react'
-import { bulkUpdateStatus, BulkUpdateResult } from '@/app/actions/bulkActions'
+import { Search, Download, ChevronLeft, ChevronRight, AlertCircle, CheckCircle2, Plus, User } from 'lucide-react'
+import { bulkUpdateStatus, bulkUpdateAssignee, bulkUpdateDueDate, BulkUpdateResult } from '@/app/actions/bulkActions'
 import { TaskStatus } from '@/lib/types'
 import TaskDetailModal from '@/components/TaskDetailModal'
 import CreateTaskDialog from '@/components/CreateTaskDialog'
@@ -74,16 +74,46 @@ export default function TaskListClient({
     setIsUpdating(true)
     setBulkResults([])
 
-    // Call our server action which validates EACH task individually
     const results = await bulkUpdateStatus(Array.from(selectedTasks), newStatus)
-    
     setBulkResults(results)
     setIsUpdating(false)
     
-    // Clear selection if everything succeeded, else keep them selected to see errors
     if (results.every(r => r.success)) {
       setSelectedTasks(new Set())
     }
+  }
+
+  const handleBulkAssigneeChange = async (assigneeId: string | null) => {
+    if (selectedTasks.size === 0) return
+    setIsUpdating(true)
+    setBulkResults([])
+
+    const results = await bulkUpdateAssignee(Array.from(selectedTasks), assigneeId)
+    setBulkResults(results)
+    setIsUpdating(false)
+
+    if (results.every(r => r.success)) {
+      setSelectedTasks(new Set())
+    }
+  }
+
+  const handleBulkDueDateChange = async (newDueDate: string) => {
+    if (selectedTasks.size === 0) return
+    setIsUpdating(true)
+    setBulkResults([])
+
+    const results = await bulkUpdateDueDate(Array.from(selectedTasks), newDueDate || null)
+    setBulkResults(results)
+    setIsUpdating(false)
+
+    if (results.every(r => r.success)) {
+      setSelectedTasks(new Set())
+    }
+  }
+
+  const getTaskTitle = (taskId: string) => {
+    const found = initialTasks.find((t: any) => t.id === taskId)
+    return found ? found.title : `Task ${taskId.slice(0, 6)}`
   }
 
   // CSV Export
@@ -216,36 +246,81 @@ export default function TaskListClient({
         </div>
       </div>
 
-      {/* Bulk Actions Bar (Appears when rows are selected) */}
+      {/* Bulk Actions Bar (Requirement 7: status move, assignee change, or a new due date) */}
       {selectedTasks.size > 0 && (
-        <div className="bg-blue-50 border-b border-blue-100 p-3 flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+        <div className="bg-blue-50 border-b border-blue-100 p-3 flex flex-wrap items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
           <span className="text-sm font-semibold text-blue-900">
             {selectedTasks.size} tasks selected
           </span>
-          <div className="flex gap-2">
-            <span className="text-sm text-blue-700 mr-2 self-center font-medium">Move to:</span>
-            <Button size="sm" variant="outline" className="h-8 border-blue-200 hover:bg-blue-100" onClick={() => handleBulkStatusChange('Backlog')} disabled={isUpdating}>Backlog</Button>
-            <Button size="sm" variant="outline" className="h-8 border-blue-200 hover:bg-blue-100" onClick={() => handleBulkStatusChange('In Progress')} disabled={isUpdating}>In Progress</Button>
-            <Button size="sm" variant="outline" className="h-8 border-blue-200 hover:bg-blue-100" onClick={() => handleBulkStatusChange('Done')} disabled={isUpdating}>Done</Button>
+          
+          <div className="flex flex-wrap items-center gap-3">
+            {/* 1. Status Move */}
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-blue-700 font-medium mr-1">Status:</span>
+              <Button size="sm" variant="outline" className="h-7 text-xs bg-white border-blue-200 hover:bg-blue-100" onClick={() => handleBulkStatusChange('Backlog')} disabled={isUpdating}>Backlog</Button>
+              <Button size="sm" variant="outline" className="h-7 text-xs bg-white border-blue-200 hover:bg-blue-100" onClick={() => handleBulkStatusChange('In Progress')} disabled={isUpdating}>In Progress</Button>
+              <Button size="sm" variant="outline" className="h-7 text-xs bg-white border-blue-200 hover:bg-blue-100" onClick={() => handleBulkStatusChange('In Review')} disabled={isUpdating}>In Review</Button>
+              <Button size="sm" variant="outline" className="h-7 text-xs bg-white border-blue-200 hover:bg-blue-100" onClick={() => handleBulkStatusChange('Done')} disabled={isUpdating}>Done</Button>
+            </div>
+
+            {/* 2. Assignee Change */}
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-blue-700 font-medium mr-1">Assign:</span>
+              <select
+                className="h-7 text-xs border border-blue-200 rounded bg-white px-2 text-gray-700 font-medium"
+                onChange={(e) => {
+                  if (e.target.value === '__UNASSIGN__') handleBulkAssigneeChange(null)
+                  else if (e.target.value) handleBulkAssigneeChange(e.target.value)
+                  e.target.value = ''
+                }}
+                defaultValue=""
+                disabled={isUpdating}
+              >
+                <option value="" disabled>Choose Assignee...</option>
+                <option value="__UNASSIGN__">Unassign All</option>
+                {(teamMembers || []).map((m: any) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* 3. New Due Date */}
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-blue-700 font-medium mr-1">Due:</span>
+              <input
+                type="date"
+                className="h-7 text-xs border border-blue-200 rounded bg-white px-2 text-gray-700"
+                onChange={(e) => {
+                  if (e.target.value) handleBulkDueDateChange(e.target.value)
+                }}
+                disabled={isUpdating}
+              />
+            </div>
           </div>
         </div>
       )}
 
-      {/* Bulk Results Feedback (Shows exactly which tasks failed and why) */}
+      {/* Bulk Results Feedback (Requirement 7: reports per task what succeeded, what was rejected and why) */}
       {bulkResults.length > 0 && (
-        <div className="p-4 border-b border-gray-200 max-h-48 overflow-y-auto bg-gray-50">
-          <h4 className="text-sm font-bold text-gray-900 mb-2">Bulk Action Results:</h4>
-          <ul className="space-y-1">
+        <div className="p-4 border-b border-gray-200 max-h-56 overflow-y-auto bg-gray-50/80">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-sm font-bold text-gray-900">Bulk Action Results ({bulkResults.filter(r => r.success).length} succeeded, {bulkResults.filter(r => !r.success).length} rejected):</h4>
+            <Button variant="ghost" size="sm" className="h-6 text-xs text-gray-500" onClick={() => setBulkResults([])}>Dismiss</Button>
+          </div>
+          <ul className="space-y-1.5">
             {bulkResults.map(res => (
-              <li key={res.taskId} className="text-sm flex items-start gap-2">
+              <li key={res.taskId} className="text-xs flex items-start gap-2 bg-white p-2 rounded border">
                 {res.success ? (
                   <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
                 ) : (
                   <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
                 )}
-                <span className={res.success ? "text-gray-700" : "text-red-700 font-medium"}>
-                  Task {res.taskId.split('-')[0]}... - {res.success ? 'Success' : res.error}
-                </span>
+                <div className="flex-1">
+                  <span className="font-semibold text-gray-800">"{getTaskTitle(res.taskId)}"</span>:
+                  <span className={res.success ? " text-green-700 ml-1.5" : " text-red-700 font-medium ml-1.5"}>
+                    {res.success ? 'Action applied successfully' : res.error}
+                  </span>
+                </div>
               </li>
             ))}
           </ul>

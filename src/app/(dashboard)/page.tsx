@@ -10,10 +10,19 @@ export default async function DashboardPage() {
   const allowedProjectIds = availableProjects.map(p => p.id)
 
   // Fetch tasks strictly according to role and project membership (Requirement 1 & 8)
-  let tasksQuery = supabase.from('tasks').select('*')
+  let tasksQuery = supabase
+    .from('tasks')
+    .select(`
+      *,
+      task_assignments (
+        user_id,
+        profiles ( id, full_name, email )
+      )
+    `)
+  
   if (!isManager) {
     tasksQuery = tasksQuery.in(
-      'project_id',
+      'project_id', 
       allowedProjectIds.length > 0 ? allowedProjectIds : ['00000000-0000-0000-0000-000000000000']
     )
   }
@@ -29,6 +38,7 @@ export default async function DashboardPage() {
   }
   
   const statusCounts: Record<string, number> = {}
+  const assigneeCounts: Record<string, number> = {}
   
   const now = new Date()
   
@@ -73,13 +83,29 @@ export default async function DashboardPage() {
         }
       }
 
-      // Status Counts for Pie Chart
+      // Status Counts for Breakdown
       statusCounts[task.status] = (statusCounts[task.status] || 0) + 1
+
+      // Assignee Counts for Breakdown (Requirement 8)
+      const assignments = task.task_assignments || []
+      if (assignments.length === 0) {
+        assigneeCounts['Unassigned'] = (assigneeCounts['Unassigned'] || 0) + 1
+      } else {
+        assignments.forEach((a: any) => {
+          const name = a.profiles?.full_name || a.profiles?.email || 'Team Member'
+          assigneeCounts[name] = (assigneeCounts[name] || 0) + 1
+        })
+      }
     })
   }
 
-  // Format status data for Recharts PieChart
+  // Format status data
   const statusData = Object.entries(statusCounts).map(([name, value]) => ({ name, value }))
+
+  // Format assignee data (Requirement 8)
+  const assigneeData = Object.entries(assigneeCounts)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
 
   // Mocking 8 weeks chart data for now, since generating 8 weeks of historical 
   // completion data dynamically requires complex queries against task_history.
@@ -111,6 +137,7 @@ export default async function DashboardPage() {
         metrics={metrics} 
         chartData={chartData} 
         statusData={statusData} 
+        assigneeData={assigneeData}
       />
 
     </div>
