@@ -26,14 +26,22 @@ const NEXT_MOVES: Record<TaskStatus, TaskStatus[]> = {
   'Backlog': ['In Progress'],
   'In Progress': ['In Review', 'Backlog'],
   'In Review': ['Done', 'In Progress'],
-  'Done': ['Backlog']
+  'Done': ['Backlog', 'In Progress']
 }
 
-export default function BoardClient({ initialTasks, projects }: { initialTasks: any[]; projects: any[] }) {
+export default function BoardClient({ 
+  initialTasks, 
+  projects,
+  defaultProject = ''
+}: { 
+  initialTasks: any[]
+  projects: any[]
+  defaultProject?: string 
+}) {
   const router = useRouter()
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedProject, setSelectedProject] = useState<string>('')
+  const [selectedProject, setSelectedProject] = useState<string>(defaultProject)
   const [error, setError] = useState<string | null>(null)
 
   const handleQuickMove = async (e: React.MouseEvent, taskId: string, newStatus: TaskStatus) => {

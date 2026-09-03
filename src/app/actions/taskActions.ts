@@ -351,6 +351,10 @@ export async function updateTaskStatus(taskId: string, newStatus: TaskStatus) {
   }
 
   // 2. Enforce Lifecycle Rules
+  if (task.is_blocked && newStatus !== task.status) {
+    return { error: 'Cannot move task: Task is currently marked as Blocked. You must unblock it before changing its status.' }
+  }
+
   const transition = await checkLegalTransition(task.status, newStatus)
   if (!transition.valid) {
     return { error: transition.reason }

@@ -2,8 +2,14 @@ import { createClient } from '@/utils/supabase/server'
 import BoardClient from './BoardClient'
 import { getUserProjects } from '@/app/actions/taskActions'
 
-export default async function BoardPage() {
+export default async function BoardPage({
+  searchParams
+}: {
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
   const supabase = await createClient()
+  const params = searchParams ? await searchParams : {}
+  const defaultProject = typeof params.project === 'string' ? params.project : ''
 
   // Fetch available projects
   const projects = await getUserProjects()
@@ -24,6 +30,7 @@ export default async function BoardPage() {
     <BoardClient 
       initialTasks={tasks || []} 
       projects={projects} 
+      defaultProject={defaultProject}
     />
   )
 }

@@ -236,7 +236,11 @@ export default function ProjectsClient({ initialProjects, isManager, allProfiles
                   </span>
                 </div>
                 
-                <CardTitle className="text-lg font-bold text-gray-900 pt-2">{proj.name}</CardTitle>
+                <CardTitle className="text-lg font-bold text-gray-900 pt-2">
+                  <Link href={`/tasks?project=${proj.id}`} className="hover:text-primary transition-colors cursor-pointer">
+                    {proj.name}
+                  </Link>
+                </CardTitle>
                 
                 <CardDescription className="line-clamp-2 text-xs">
                   {proj.description || 'No description provided.'}

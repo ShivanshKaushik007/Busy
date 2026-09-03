@@ -92,13 +92,17 @@ export default async function TasksPage({
   // Execute Query
   const { data: tasks, count, error } = await supabaseQuery
 
+  const activeProject = availableProjects.find(p => p.id === projectParam)
+
   return (
     <div className="space-y-6">
       <div className="space-y-1">
         <nav className="text-sm text-gray-500 mb-2">
-          Projects / Company Portfolio / <span className="text-gray-900 font-medium">Issues</span>
+          Projects / {activeProject ? `${activeProject.name}` : 'Company Portfolio'} / <span className="text-gray-900 font-medium">Issues</span>
         </nav>
-        <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">All Tasks</h2>
+        <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
+          {activeProject ? `[${activeProject.key}] ${activeProject.name}` : 'All Tasks'}
+        </h2>
       </div>
 
       {/* 
