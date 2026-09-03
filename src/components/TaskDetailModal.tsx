@@ -348,6 +348,22 @@ export default function TaskDetailModal({ taskId, onClose, onTaskUpdated }: Task
                             <p className="text-gray-600">
                               {h.new_value === 'true' ? 'Marked task as BLOCKED' : 'UNBLOCKED task'}
                             </p>
+                          ) : h.action_type === 'created' ? (
+                            <p className="text-gray-600 font-medium">
+                              Created task: <span className="text-gray-900">"{h.new_value}"</span>
+                            </p>
+                          ) : h.action_type === 'assignment' ? (
+                            <p className="text-gray-600 font-medium">
+                              Assigned team member to task
+                            </p>
+                          ) : h.action_type === 'unassignment' ? (
+                            <p className="text-gray-600 font-medium">
+                              Unassigned team member from task
+                            </p>
+                          ) : h.action_type?.startsWith('updated_') ? (
+                            <p className="text-gray-600">
+                              Updated <span className="font-semibold text-gray-800 capitalize">{h.action_type.replace('updated_', '').replace('_', ' ')}</span> from <span className="line-through text-gray-400">{h.old_value || 'None'}</span> to <span className="font-medium text-gray-900">{h.new_value || 'None'}</span>
+                            </p>
                           ) : (
                             <p className="text-gray-600">
                               {h.new_value || h.action_type}
