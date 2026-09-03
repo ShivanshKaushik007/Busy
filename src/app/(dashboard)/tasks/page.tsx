@@ -53,7 +53,10 @@ export default async function TasksPage({
   const selectClause = `
     *,
     projects ( id, name, key ),
-    task_assignments${filterAssigneeId ? '!inner' : ''} ( user_id )
+    task_assignments${filterAssigneeId ? '!inner' : ''} ( 
+      user_id,
+      profiles ( id, full_name, email )
+    )
   `
   let supabaseQuery = supabase
     .from('tasks')
@@ -118,29 +121,15 @@ export default async function TasksPage({
   const activeProject = availableProjects.find(p => p.id === projectParam)
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-1">
-        <nav className="text-sm text-gray-500 mb-2">
-          Projects / {activeProject ? `${activeProject.name}` : 'Company Portfolio'} / <span className="text-gray-900 font-medium">Issues</span>
-        </nav>
-        <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
-          {activeProject ? `[${activeProject.key}] ${activeProject.name}` : 'All Tasks'}
-        </h2>
-      </div>
-
-      {/* 
-        We pass the STRICTLY server-filtered data to the client component,
-        which handles the interactive table checkboxes and dropdowns!
-      */}
-      <TaskListClient 
-        initialTasks={tasks || []} 
-        totalCount={count || 0}
-        currentPage={page}
-        currentSort={sort}
-        projects={availableProjects}
-        teamMembers={teamMembers}
-        currentUserId={user?.id}
-      />
-    </div>
+    <TaskListClient 
+      initialTasks={tasks || []} 
+      totalCount={count || 0}
+      currentPage={page}
+      currentSort={sort}
+      projects={availableProjects}
+      teamMembers={teamMembers}
+      currentUserId={user?.id}
+      activeProject={activeProject}
+    />
   )
 }

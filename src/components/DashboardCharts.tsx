@@ -1,9 +1,32 @@
 'use client'
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import React from 'react'
 import { motion } from 'framer-motion'
-import { CheckCircle2, AlertCircle, CalendarClock, Target, User, BarChart3 } from 'lucide-react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import { 
+  CheckCircle2, 
+  AlertCircle, 
+  CalendarClock, 
+  Target, 
+  User, 
+  BarChart3,
+  TrendingUp,
+  Activity,
+  Layers
+} from 'lucide-react'
+import { 
+  LineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer, 
+  PieChart, 
+  Pie, 
+  Cell 
+} from 'recharts'
+import BusyLozenge from '@/components/busy/BusyLozenge'
+import BusyAvatar from '@/components/busy/BusyAvatar'
 
 interface DashboardDataProps {
   metrics: {
@@ -17,94 +40,151 @@ interface DashboardDataProps {
   assigneeData?: { name: string; count: number }[];
 }
 
-const COLORS = ['#0052CC', '#FF991F', '#00875A', '#DE350B', '#6554C0'];
+const BUSY_COLORS: Record<string, string> = {
+  'Backlog': '#42526E',
+  'In Progress': '#0052CC',
+  'In Review': '#FFAB00',
+  'Done': '#00875A',
+  'Blocked': '#DE350B'
+}
 
-export default function DashboardCharts({ metrics, chartData, statusData, assigneeData = [] }: DashboardDataProps) {
-  const totalTasks = metrics.openTasks + metrics.completedThisWeek || 1;
+const FALLBACK_COLORS = ['#0052CC', '#00875A', '#FFAB00', '#DE350B', '#6554C0']
+
+export default function DashboardCharts({ 
+  metrics, 
+  chartData, 
+  statusData, 
+  assigneeData = [] 
+}: DashboardDataProps) {
+  const totalTasks = metrics.openTasks + metrics.completedThisWeek || 1
 
   return (
-    <div className="space-y-6">
-      {/* 1. Headline Numbers (Requirement 8) */}
-      <motion.div 
-        className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, staggerChildren: 0.1 }}
-      >
-        <Card className="border-gray-200 shadow-xs hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-semibold text-gray-600">Open Tasks</CardTitle>
-            <Target className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{metrics.openTasks}</div>
-            <p className="text-xs text-gray-400 mt-1">Active backlog & sprint items</p>
-          </CardContent>
-        </Card>
-        
-        <Card className="border-gray-200 shadow-xs hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-semibold text-gray-600">Overdue</CardTitle>
-            <AlertCircle className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">{metrics.overdueTasks}</div>
-            <p className="text-xs text-red-500 mt-1">Tasks past their due date</p>
-          </CardContent>
-        </Card>
+    <div className="space-y-6 select-none">
+      {/* 1. Jira Headline Gadgets (Requirement 8) */}
+      <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Open Tasks */}
+        <div className="bg-white border border-[#DFE1E6] rounded-[3px] p-4 shadow-2xs relative overflow-hidden border-t-4 border-t-[#0052CC]">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-[#5E6C84] uppercase tracking-wider">
+              Open Issues
+            </span>
+            <Target className="w-4 h-4 text-[#0052CC]" />
+          </div>
+          <div className="mt-2 text-3xl font-bold text-[#172B4D] tracking-tight">
+            {metrics.openTasks}
+          </div>
+          <p className="text-[11px] text-[#5E6C84] mt-1">Active backlog & sprint items</p>
+        </div>
 
-        <Card className="border-gray-200 shadow-xs hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-semibold text-gray-600">Due This Week</CardTitle>
-            <CalendarClock className="h-4 w-4 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{metrics.dueThisWeek}</div>
-            <p className="text-xs text-orange-600 mt-1">Expiring within 7 days</p>
-          </CardContent>
-        </Card>
+        {/* Overdue Tasks */}
+        <div className="bg-white border border-[#DFE1E6] rounded-[3px] p-4 shadow-2xs relative overflow-hidden border-t-4 border-t-[#DE350B]">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-[#DE350B] uppercase tracking-wider">
+              Overdue
+            </span>
+            <AlertCircle className="w-4 h-4 text-[#DE350B]" />
+          </div>
+          <div className="mt-2 text-3xl font-bold text-[#DE350B] tracking-tight">
+            {metrics.overdueTasks}
+          </div>
+          <p className="text-[11px] text-[#DE350B] mt-1 font-medium">Issues past due date</p>
+        </div>
 
-        <Card className="border-gray-200 shadow-xs hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-semibold text-gray-600">Completed This Week</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{metrics.completedThisWeek}</div>
-            <p className="text-xs text-green-600 mt-1">Moved to Done this cycle</p>
-          </CardContent>
-        </Card>
-      </motion.div>
+        {/* Due This Week */}
+        <div className="bg-white border border-[#DFE1E6] rounded-[3px] p-4 shadow-2xs relative overflow-hidden border-t-4 border-t-[#FFAB00]">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-[#5E6C84] uppercase tracking-wider">
+              Due This Week
+            </span>
+            <CalendarClock className="w-4 h-4 text-[#FFAB00]" />
+          </div>
+          <div className="mt-2 text-3xl font-bold text-[#172B4D] tracking-tight">
+            {metrics.dueThisWeek}
+          </div>
+          <p className="text-[11px] text-[#5E6C84] mt-1">Expiring within 7 days</p>
+        </div>
 
-      {/* 2. Charts: 8-Week Completions & Status Pie Chart */}
-      <motion.div 
-        className="grid gap-4 md:grid-cols-2 lg:grid-cols-7"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.15 }}
-      >
-        <Card className="col-span-4 border-gray-200 shadow-xs">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold text-gray-800">Completions over last 8 weeks</CardTitle>
-          </CardHeader>
-          <CardContent className="h-[280px] w-full pt-2">
+        {/* Completed This Week */}
+        <div className="bg-white border border-[#DFE1E6] rounded-[3px] p-4 shadow-2xs relative overflow-hidden border-t-4 border-t-[#00875A]">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-[#00875A] uppercase tracking-wider">
+              Completed
+            </span>
+            <CheckCircle2 className="w-4 h-4 text-[#00875A]" />
+          </div>
+          <div className="mt-2 text-3xl font-bold text-[#00875A] tracking-tight">
+            {metrics.completedThisWeek}
+          </div>
+          <p className="text-[11px] text-[#00875A] mt-1 font-medium">Moved to Done this cycle</p>
+        </div>
+      </div>
+
+      {/* 2. Charts: 8-Week Velocity & Status Distribution */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        {/* Sprint Completion Velocity */}
+        <div className="lg:col-span-4 bg-white border border-[#DFE1E6] rounded-[3px] shadow-2xs p-4 flex flex-col">
+          <div className="border-b border-[#DFE1E6] pb-3 mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-[#0052CC]" />
+              <h3 className="text-sm font-bold text-[#172B4D]">
+                Velocity (Completions Over Last 8 Weeks)
+              </h3>
+            </div>
+            <span className="text-[11px] text-[#5E6C84] font-medium">Sprint trends</span>
+          </div>
+
+          <div className="h-[260px] w-full pt-2">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} dx={-10} />
-                <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                <Line type="monotone" dataKey="completed" stroke="var(--primary)" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6, strokeWidth: 0 }} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#EBECF0" />
+                <XAxis 
+                  dataKey="name" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: '#5E6C84', fontSize: 11, fontWeight: 500 }} 
+                  dy={10} 
+                />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: '#5E6C84', fontSize: 11 }} 
+                  dx={-10} 
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    borderRadius: '3px', 
+                    border: '1px solid #DFE1E6', 
+                    backgroundColor: '#FFFFFF',
+                    boxShadow: '0 4px 8px -2px rgba(9, 30, 66, 0.15)',
+                    fontSize: '12px'
+                  }} 
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="completed" 
+                  stroke="#0052CC" 
+                  strokeWidth={2.5} 
+                  dot={{ r: 4, stroke: '#0052CC', strokeWidth: 2, fill: '#FFFFFF' }} 
+                  activeDot={{ r: 6, stroke: '#0052CC', strokeWidth: 0, fill: '#0052CC' }} 
+                />
               </LineChart>
             </ResponsiveContainer>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
         
-        <Card className="col-span-3 border-gray-200 shadow-xs">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold text-gray-800">Tasks by Status</CardTitle>
-          </CardHeader>
-          <CardContent className="h-[280px] flex items-center justify-center border-t border-gray-100 pt-2">
+        {/* Status Distribution Donut */}
+        <div className="lg:col-span-3 bg-white border border-[#DFE1E6] rounded-[3px] shadow-2xs p-4 flex flex-col">
+          <div className="border-b border-[#DFE1E6] pb-3 mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Activity className="w-4 h-4 text-[#0052CC]" />
+              <h3 className="text-sm font-bold text-[#172B4D]">
+                Issues by Status
+              </h3>
+            </div>
+            <span className="text-[11px] text-[#5E6C84] font-medium">Distribution</span>
+          </div>
+
+          <div className="h-[260px] flex items-center justify-center pt-2">
             {statusData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -114,100 +194,112 @@ export default function DashboardCharts({ metrics, chartData, statusData, assign
                     cy="50%"
                     innerRadius={55}
                     outerRadius={80}
-                    paddingAngle={5}
+                    paddingAngle={4}
                     dataKey="value"
                   >
-                    {statusData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
+                    {statusData.map((entry, index) => {
+                      const color = BUSY_COLORS[entry.name] || FALLBACK_COLORS[index % FALLBACK_COLORS.length]
+                      return <Cell key={`cell-${index}`} fill={color} />
+                    })}
                   </Pie>
-                  <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      borderRadius: '3px', 
+                      border: '1px solid #DFE1E6', 
+                      backgroundColor: '#FFFFFF',
+                      boxShadow: '0 4px 8px -2px rgba(9, 30, 66, 0.15)',
+                      fontSize: '12px'
+                    }} 
+                  />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-               <p className="text-sm text-gray-500">No tasks found</p>
+               <p className="text-xs text-[#5E6C84] italic">No issues recorded yet</p>
             )}
-          </CardContent>
-        </Card>
-      </motion.div>
+          </div>
+        </div>
+      </div>
 
-      {/* 3. Detailed Breakdown: By Assignee & By Status (Requirement 8) */}
-      <motion.div
-        className="grid gap-4 md:grid-cols-2"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.25 }}
-      >
-        {/* Breakdown by Assignee */}
-        <Card className="border-gray-200 shadow-xs">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold text-gray-800 flex items-center gap-2">
-              <User className="h-4 w-4 text-primary" />
-              Tasks by Assignee
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 pt-0">
+      {/* 3. Detailed Gadgets: Workload by Assignee & Status Counts */}
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* Assignee Workload */}
+        <div className="bg-white border border-[#DFE1E6] rounded-[3px] shadow-2xs p-4">
+          <div className="border-b border-[#DFE1E6] pb-3 mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <User className="w-4 h-4 text-[#0052CC]" />
+              <h3 className="text-sm font-bold text-[#172B4D]">Workload by Assignee</h3>
+            </div>
+            <span className="text-[11px] text-[#5E6C84]">Team distribution</span>
+          </div>
+
+          <div className="space-y-3 pt-1">
             {assigneeData.length === 0 ? (
-              <p className="text-sm text-gray-500">No tasks assigned yet.</p>
+              <p className="text-xs text-[#5E6C84] italic">No issues assigned yet.</p>
             ) : (
               assigneeData.map((item) => {
-                const pct = Math.min(100, Math.round((item.count / totalTasks) * 100));
+                const pct = Math.min(100, Math.round((item.count / totalTasks) * 100))
                 return (
-                  <div key={item.name} className="space-y-1">
-                    <div className="flex items-center justify-between text-xs font-medium text-gray-700">
-                      <span className="truncate">{item.name}</span>
-                      <span className="text-gray-500">{item.count} task{item.count === 1 ? '' : 's'} ({pct}%)</span>
+                  <div key={item.name} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs font-medium text-[#172B4D]">
+                      <div className="flex items-center gap-2">
+                        <BusyAvatar name={item.name} size="xs" />
+                        <span className="truncate max-w-[180px]">{item.name}</span>
+                      </div>
+                      <span className="text-[#5E6C84] font-semibold">{item.count} issues ({pct}%)</span>
                     </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="w-full bg-[#EBECF0] rounded-full h-1.5">
                       <div
-                        className="bg-primary h-2 rounded-full transition-all duration-500"
-                        style={{ width: `${Math.max(pct, 6)}%` }}
+                        className="bg-[#0052CC] h-1.5 rounded-full transition-all duration-500"
+                        style={{ width: `${Math.max(pct, 5)}%` }}
                       />
                     </div>
                   </div>
-                );
+                )
               })
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        {/* Breakdown by Status */}
-        <Card className="border-gray-200 shadow-xs">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold text-gray-800 flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-blue-600" />
-              Status Distribution Breakdown
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 pt-0">
+        {/* Status Distribution Summary */}
+        <div className="bg-white border border-[#DFE1E6] rounded-[3px] shadow-2xs p-4">
+          <div className="border-b border-[#DFE1E6] pb-3 mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-[#0052CC]" />
+              <h3 className="text-sm font-bold text-[#172B4D]">Status Summary</h3>
+            </div>
+            <span className="text-[11px] text-[#5E6C84]">All portfolio issues</span>
+          </div>
+
+          <div className="space-y-2.5 pt-1">
             {statusData.length === 0 ? (
-              <p className="text-sm text-gray-500">No tasks available.</p>
+              <p className="text-xs text-[#5E6C84] italic">No issues available.</p>
             ) : (
               statusData.map((item, idx) => {
-                const total = statusData.reduce((acc, curr) => acc + curr.value, 0) || 1;
-                const pct = Math.round((item.value / total) * 100);
+                const total = statusData.reduce((acc, curr) => acc + curr.value, 0) || 1
+                const pct = Math.round((item.value / total) * 100)
+                const color = BUSY_COLORS[item.name] || FALLBACK_COLORS[idx % FALLBACK_COLORS.length]
+
                 return (
-                  <div key={item.name} className="space-y-1">
-                    <div className="flex items-center justify-between text-xs font-medium text-gray-700">
-                      <span className="flex items-center gap-1.5">
-                        <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
-                        {item.name}
-                      </span>
-                      <span className="text-gray-500">{item.value} ({pct}%)</span>
+                  <div key={item.name} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs font-medium text-[#172B4D]">
+                      <div className="flex items-center gap-2">
+                        <BusyLozenge status={item.name} size="sm" />
+                      </div>
+                      <span className="text-[#5E6C84] font-semibold">{item.value} ({pct}%)</span>
                     </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="w-full bg-[#EBECF0] rounded-full h-1.5">
                       <div
-                        className="h-2 rounded-full transition-all duration-500"
-                        style={{ width: `${Math.max(pct, 6)}%`, backgroundColor: COLORS[idx % COLORS.length] }}
+                        className="h-1.5 rounded-full transition-all duration-500"
+                        style={{ width: `${Math.max(pct, 5)}%`, backgroundColor: color }}
                       />
                     </div>
                   </div>
-                );
+                )
               })
             )}
-          </CardContent>
-        </Card>
-      </motion.div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

@@ -1,17 +1,31 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Badge } from '@/components/ui/badge'
-import { Search, Download, ChevronLeft, ChevronRight, AlertCircle, CheckCircle2, Plus, User } from 'lucide-react'
+import Link from 'next/link'
+import { 
+  Search, 
+  Download, 
+  ChevronLeft, 
+  ChevronRight, 
+  AlertCircle, 
+  CheckCircle2, 
+  Plus, 
+  Calendar,
+  X,
+  Filter,
+  ArrowUpDown,
+  UserCheck
+} from 'lucide-react'
 import { bulkUpdateStatus, bulkUpdateAssignee, bulkUpdateDueDate, BulkUpdateResult } from '@/app/actions/bulkActions'
 import { TaskStatus } from '@/lib/types'
 import TaskDetailModal from '@/components/TaskDetailModal'
 import CreateTaskDialog from '@/components/CreateTaskDialog'
+import BusyLozenge from '@/components/busy/BusyLozenge'
+import BusyPriorityIcon from '@/components/busy/BusyPriorityIcon'
+import BusyIssueTypeIcon from '@/components/busy/BusyIssueTypeIcon'
+import BusyAvatar from '@/components/busy/BusyAvatar'
+import { formatShortDate, formatFullDate } from '@/lib/dateUtils'
 
 export default function TaskListClient({ 
   initialTasks, 
@@ -20,7 +34,8 @@ export default function TaskListClient({
   currentSort,
   projects = [],
   teamMembers = [],
-  currentUserId
+  currentUserId,
+  activeProject
 }: any) {
   const router = useRouter()
   const pathname = usePathname()
@@ -30,8 +45,9 @@ export default function TaskListClient({
   const [isUpdating, setIsUpdating] = useState(false)
   const [bulkResults, setBulkResults] = useState<BulkUpdateResult[]>([])
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
+  const [searchInput, setSearchInput] = useState(searchParams.get('q') || '')
 
-  // Helper to update URL params which triggers a server-side refetch!
+  // Helper to update URL params triggering server-side refetch
   const updateFilter = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString())
     if (value) {
@@ -39,20 +55,17 @@ export default function TaskListClient({
     } else {
       params.delete(key)
     }
-    // Reset to page 1 on new filter
     if (key !== 'page') params.set('page', '1')
     
     router.push(`${pathname}?${params.toString()}`)
   }
 
-  // Handle Search Input (debounced in a real app, direct for now)
-  const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      updateFilter('q', e.currentTarget.value)
-    }
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    updateFilter('q', searchInput)
   }
 
-  // Checkbox logic
+  // Checkbox selection
   const toggleAll = (checked: boolean) => {
     if (checked) {
       setSelectedTasks(new Set(initialTasks.map((t: any) => t.id)))
@@ -113,52 +126,98 @@ export default function TaskListClient({
 
   const getTaskTitle = (taskId: string) => {
     const found = initialTasks.find((t: any) => t.id === taskId)
-    return found ? found.title : `Task ${taskId.slice(0, 6)}`
+    return found ? found.title : `Task ${taskId.slice(0, 4)}`
   }
 
   // CSV Export
   const exportCSV = () => {
-    // Generate CSV string from the currently filtered tasks
-    const headers = ['ID', 'Title', 'Status', 'Priority', 'Due Date']
-    const rows = initialTasks.map((t: any) => 
-      [t.id, `"${t.title.replace(/"/g, '""')}"`, t.status, t.priority, t.due_date || '']
-    )
+    const headers = ['Issue Key', 'Title', 'Status', 'Priority', 'Due Date', 'Updated At']
+    const rows = initialTasks.map((t: any) => [
+      `${t.projects?.key || 'TASK'}-${t.id.slice(0, 4)}`,
+      `"${t.title.replace(/"/g, '""')}"`,
+      t.status,
+      t.priority,
+      t.due_date || '',
+      t.updated_at || ''
+    ])
     
     const csvContent = [headers.join(','), ...rows.map((r: any[]) => r.join(','))].join('\n')
-    
-    // Create a Blob and download it
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
-    link.setAttribute('download', 'tasks_export.csv')
+    link.setAttribute('download', 'busy_issues_export.csv')
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
   }
 
+  const isAssignedToMe = searchParams.get('assignedToMe') === 'true'
+  const isOverdue = searchParams.get('overdue') === 'true'
+
   return (
-    <div className="bg-white rounded-md border border-gray-200 shadow-sm overflow-hidden flex flex-col">
-      
-      {/* Toolbar Area */}
-      <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-gray-50/50">
-        <div className="flex flex-wrap items-center gap-2 flex-1 w-full max-w-2xl">
-          <div className="relative flex-1 min-w-[180px]">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-            <Input 
-              placeholder="Search issues..." 
-              defaultValue={searchParams.get('q') || ''}
-              onKeyDown={handleSearch}
-              className="pl-8 bg-white border-gray-300 h-9"
+    <div className="space-y-4 flex flex-col h-full select-none">
+      {/* 1. Jira Breadcrumb & Header */}
+      <div>
+        <nav className="text-xs text-[#5E6C84] mb-1 flex items-center gap-1.5 font-medium">
+          <Link href="/projects" className="hover:text-[#0052CC] transition-colors">Projects</Link>
+          <span>/</span>
+          <span>{activeProject ? activeProject.name : 'Company Portfolio'}</span>
+          <span>/</span>
+          <span className="text-[#172B4D] font-semibold">Search issues</span>
+        </nav>
+        
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-[#172B4D] tracking-tight">
+              {activeProject ? `[${activeProject.key}] Issues` : 'All Issues'}
+            </h1>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-[3px] bg-[#EBECF0] text-[#42526E]">
+              {totalCount} {totalCount === 1 ? 'issue' : 'issues'}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={exportCSV}
+              className="h-8 px-2.5 text-xs font-medium rounded-[3px] border border-[#DFE1E6] bg-[#FAFBFC] hover:bg-[#EBECF0] text-[#42526E] hover:text-[#172B4D] transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Export CSV</span>
+            </button>
+            <CreateTaskDialog 
+              trigger={
+                <button className="bg-[#0052CC] hover:bg-[#0747A6] active:bg-[#0047B3] text-white font-medium text-xs px-3 py-1.5 rounded-[3px] shadow-2xs transition-colors flex items-center gap-1 cursor-pointer">
+                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Create issue</span>
+                </button>
+              }
             />
           </div>
-          
+        </div>
+      </div>
+
+      {/* 2. Jira Search & Filters Toolbar */}
+      <div className="bg-[#FAFBFC] border border-[#DFE1E6] rounded-[3px] p-3 space-y-3">
+        <form onSubmit={handleSearchSubmit} className="flex flex-wrap items-center gap-2">
+          {/* Search Input */}
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
+            <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-[#5E6C84]" />
+            <input 
+              type="text"
+              placeholder="Search by text or description..." 
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="w-full h-8 pl-8 pr-3 bg-white border border-[#DFE1E6] focus:border-[#0052CC] focus:ring-1 focus:ring-[#0052CC] rounded-[3px] text-xs text-[#172B4D] placeholder:text-[#5E6C84] transition-all outline-none"
+            />
+          </div>
+
           {/* Project Filter */}
           <select 
-            className="h-9 border border-gray-300 rounded-md bg-white px-3 text-sm text-gray-700"
+            className="h-8 border border-[#DFE1E6] rounded-[3px] bg-white px-2.5 text-xs text-[#172B4D] font-medium outline-none cursor-pointer hover:bg-[#EBECF0]"
             value={searchParams.get('project') || ''}
             onChange={(e) => updateFilter('project', e.target.value)}
           >
-            <option value="">All Projects</option>
+            <option value="">Project: All</option>
             {projects.map((p: any) => (
               <option key={p.id} value={p.id}>[{p.key}] {p.name}</option>
             ))}
@@ -166,21 +225,21 @@ export default function TaskListClient({
 
           {/* Status Filter */}
           <select 
-            className="h-9 border border-gray-300 rounded-md bg-white px-3 text-sm text-gray-700"
+            className="h-8 border border-[#DFE1E6] rounded-[3px] bg-white px-2.5 text-xs text-[#172B4D] font-medium outline-none cursor-pointer hover:bg-[#EBECF0]"
             value={searchParams.get('status') || ''}
             onChange={(e) => updateFilter('status', e.target.value)}
           >
-            <option value="">All Statuses</option>
+            <option value="">Status: All</option>
             <option value="Backlog">Backlog</option>
             <option value="In Progress">In Progress</option>
             <option value="In Review">In Review</option>
             <option value="Done">Done</option>
           </select>
 
-          {/* Assignee Filter (Requirement 5 & 6) */}
+          {/* Assignee Filter */}
           <select 
-            className="h-9 border border-gray-300 rounded-md bg-white px-3 text-sm text-gray-700"
-            value={searchParams.get('assignee') || (searchParams.get('assignedToMe') === 'true' ? 'me' : '')}
+            className="h-8 border border-[#DFE1E6] rounded-[3px] bg-white px-2.5 text-xs text-[#172B4D] font-medium outline-none cursor-pointer hover:bg-[#EBECF0]"
+            value={searchParams.get('assignee') || (isAssignedToMe ? 'me' : '')}
             onChange={(e) => {
               if (e.target.value === 'me') {
                 updateFilter('assignedToMe', 'true')
@@ -191,83 +250,120 @@ export default function TaskListClient({
               }
             }}
           >
-            <option value="">All Assignees</option>
+            <option value="">Assignee: All</option>
             <option value="me">Assigned to Me</option>
             {(teamMembers || []).map((m: any) => (
               <option key={m.id} value={m.id}>{m.name}</option>
             ))}
           </select>
 
-          {/* Priority Filter (Requirement 6) */}
+          {/* Priority Filter */}
           <select 
-            className="h-9 border border-gray-300 rounded-md bg-white px-3 text-sm text-gray-700"
+            className="h-8 border border-[#DFE1E6] rounded-[3px] bg-white px-2.5 text-xs text-[#172B4D] font-medium outline-none cursor-pointer hover:bg-[#EBECF0]"
             value={searchParams.get('priority') || ''}
             onChange={(e) => updateFilter('priority', e.target.value)}
           >
-            <option value="">All Priorities</option>
+            <option value="">Priority: All</option>
             <option value="Low">Low</option>
             <option value="Medium">Medium</option>
             <option value="High">High</option>
             <option value="Urgent">Urgent</option>
           </select>
 
-          {/* Quick "My Tasks" Button (Requirement 5) */}
-          <Button 
-            variant={searchParams.get('assignedToMe') === 'true' ? "default" : "outline"} 
-            size="sm" 
-            className="h-9" 
-            onClick={() => updateFilter('assignedToMe', searchParams.get('assignedToMe') === 'true' ? '' : 'true')}
+          {/* Quick "My Tasks" Button */}
+          <button 
+            type="button"
+            onClick={() => updateFilter('assignedToMe', isAssignedToMe ? '' : 'true')}
+            className={`h-8 px-2.5 text-xs font-medium rounded-[3px] border transition-colors cursor-pointer flex items-center gap-1 ${
+              isAssignedToMe 
+                ? 'bg-[#DEEBFF] text-[#0052CC] border-[#B3D4FF] font-semibold' 
+                : 'bg-white text-[#42526E] border-[#DFE1E6] hover:bg-[#EBECF0] hover:text-[#172B4D]'
+            }`}
           >
-            {searchParams.get('assignedToMe') === 'true' ? 'My Tasks (Active)' : 'My Tasks'}
-          </Button>
+            <UserCheck className="w-3.5 h-3.5" />
+            <span>My issues</span>
+          </button>
 
-          {/* Overdue Filter */}
-          <Button variant={searchParams.get('overdue') === 'true' ? "default" : "outline"} size="sm" className="h-9" onClick={() => updateFilter('overdue', searchParams.get('overdue') === 'true' ? '' : 'true')}>
-            {searchParams.get('overdue') === 'true' ? 'Clear Overdue' : 'Overdue Only'}
-          </Button>
-
-          {/* Sort Selector (Requirement 6: sorting by due date, priority or last update) */}
-          <select 
-            className="h-9 border border-gray-300 rounded-md bg-white px-3 text-sm text-gray-700 font-medium"
-            value={searchParams.get('sort') || currentSort || 'updated_at'}
-            onChange={(e) => updateFilter('sort', e.target.value)}
+          {/* Quick "Overdue" Filter Button */}
+          <button 
+            type="button"
+            onClick={() => updateFilter('overdue', isOverdue ? '' : 'true')}
+            className={`h-8 px-2.5 text-xs font-medium rounded-[3px] border transition-colors cursor-pointer ${
+              isOverdue 
+                ? 'bg-[#FFEBE6] text-[#DE350B] border-[#FFBDAD] font-semibold' 
+                : 'bg-white text-[#42526E] border-[#DFE1E6] hover:bg-[#EBECF0] hover:text-[#172B4D]'
+            }`}
           >
-            <option value="updated_at">Sort: Last Update</option>
-            <option value="due_date">Sort: Due Date</option>
-            <option value="priority">Sort: Priority</option>
-          </select>
-        </div>
+            {isOverdue ? 'Clear Overdue' : 'Overdue only'}
+          </button>
 
-        <div className="flex items-center gap-2">
-          <CreateTaskDialog />
-          <Button variant="outline" size="sm" className="h-9 gap-2" onClick={exportCSV}>
-            <Download className="h-4 w-4" /> Export CSV
-          </Button>
-        </div>
+          {/* Sort Selector */}
+          <div className="ml-auto flex items-center gap-1 text-xs text-[#5E6C84]">
+            <ArrowUpDown className="w-3.5 h-3.5" />
+            <select 
+              className="h-8 border border-[#DFE1E6] rounded-[3px] bg-white px-2 text-xs text-[#172B4D] font-medium outline-none cursor-pointer hover:bg-[#EBECF0]"
+              value={searchParams.get('sort') || currentSort || 'updated_at'}
+              onChange={(e) => updateFilter('sort', e.target.value)}
+            >
+              <option value="updated_at">Sort: Last Update</option>
+              <option value="due_date">Sort: Due Date</option>
+              <option value="priority">Sort: Priority</option>
+            </select>
+          </div>
+        </form>
       </div>
 
-      {/* Bulk Actions Bar (Requirement 7: status move, assignee change, or a new due date) */}
+      {/* 3. Bulk Actions Toolbar (Jira ADS Banner) */}
       {selectedTasks.size > 0 && (
-        <div className="bg-blue-50 border-b border-blue-100 p-3 flex flex-wrap items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
-          <span className="text-sm font-semibold text-blue-900">
-            {selectedTasks.size} tasks selected
-          </span>
+        <div className="bg-[#DEEBFF] border border-[#B3D4FF] rounded-[3px] p-2.5 flex flex-wrap items-center justify-between gap-3 animate-in fade-in slide-in-from-top-1">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-[#0052CC] bg-white px-2 py-0.5 rounded-[3px] border border-[#B3D4FF]">
+              {selectedTasks.size} selected
+            </span>
+            <span className="text-xs text-[#0747A6] font-medium hidden sm:inline">
+              Bulk actions available:
+            </span>
+          </div>
           
-          <div className="flex flex-wrap items-center gap-3">
-            {/* 1. Status Move */}
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-blue-700 font-medium mr-1">Status:</span>
-              <Button size="sm" variant="outline" className="h-7 text-xs bg-white border-blue-200 hover:bg-blue-100" onClick={() => handleBulkStatusChange('Backlog')} disabled={isUpdating}>Backlog</Button>
-              <Button size="sm" variant="outline" className="h-7 text-xs bg-white border-blue-200 hover:bg-blue-100" onClick={() => handleBulkStatusChange('In Progress')} disabled={isUpdating}>In Progress</Button>
-              <Button size="sm" variant="outline" className="h-7 text-xs bg-white border-blue-200 hover:bg-blue-100" onClick={() => handleBulkStatusChange('In Review')} disabled={isUpdating}>In Review</Button>
-              <Button size="sm" variant="outline" className="h-7 text-xs bg-white border-blue-200 hover:bg-blue-100" onClick={() => handleBulkStatusChange('Done')} disabled={isUpdating}>Done</Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Status transitions */}
+            <div className="flex items-center gap-1 bg-white/70 p-1 rounded-[3px] border border-[#B3D4FF]/60">
+              <span className="text-[11px] text-[#0747A6] font-bold px-1">Move:</span>
+              <button 
+                onClick={() => handleBulkStatusChange('Backlog')} 
+                disabled={isUpdating}
+                className="text-[11px] font-semibold px-2 py-0.5 rounded-[2px] bg-white border border-[#DFE1E6] hover:bg-[#0052CC] hover:text-white text-[#42526E] transition-colors cursor-pointer"
+              >
+                Backlog
+              </button>
+              <button 
+                onClick={() => handleBulkStatusChange('In Progress')} 
+                disabled={isUpdating}
+                className="text-[11px] font-semibold px-2 py-0.5 rounded-[2px] bg-white border border-[#DFE1E6] hover:bg-[#0052CC] hover:text-white text-[#42526E] transition-colors cursor-pointer"
+              >
+                In Progress
+              </button>
+              <button 
+                onClick={() => handleBulkStatusChange('In Review')} 
+                disabled={isUpdating}
+                className="text-[11px] font-semibold px-2 py-0.5 rounded-[2px] bg-white border border-[#DFE1E6] hover:bg-[#0052CC] hover:text-white text-[#42526E] transition-colors cursor-pointer"
+              >
+                In Review
+              </button>
+              <button 
+                onClick={() => handleBulkStatusChange('Done')} 
+                disabled={isUpdating}
+                className="text-[11px] font-semibold px-2 py-0.5 rounded-[2px] bg-white border border-[#DFE1E6] hover:bg-[#0052CC] hover:text-white text-[#42526E] transition-colors cursor-pointer"
+              >
+                Done
+              </button>
             </div>
 
-            {/* 2. Assignee Change */}
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-blue-700 font-medium mr-1">Assign:</span>
+            {/* Bulk Assignee */}
+            <div className="flex items-center gap-1 bg-white/70 p-1 rounded-[3px] border border-[#B3D4FF]/60">
+              <span className="text-[11px] text-[#0747A6] font-bold px-1">Assign:</span>
               <select
-                className="h-7 text-xs border border-blue-200 rounded bg-white px-2 text-gray-700 font-medium"
+                className="h-6 text-[11px] border border-[#DFE1E6] rounded-[2px] bg-white px-1.5 text-[#172B4D] font-medium outline-none cursor-pointer"
                 onChange={(e) => {
                   if (e.target.value === '__UNASSIGN__') handleBulkAssigneeChange(null)
                   else if (e.target.value) handleBulkAssigneeChange(e.target.value)
@@ -276,7 +372,7 @@ export default function TaskListClient({
                 defaultValue=""
                 disabled={isUpdating}
               >
-                <option value="" disabled>Choose Assignee...</option>
+                <option value="" disabled>Choose...</option>
                 <option value="__UNASSIGN__">Unassign All</option>
                 {(teamMembers || []).map((m: any) => (
                   <option key={m.id} value={m.id}>{m.name}</option>
@@ -284,41 +380,56 @@ export default function TaskListClient({
               </select>
             </div>
 
-            {/* 3. New Due Date */}
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-blue-700 font-medium mr-1">Due:</span>
+            {/* Bulk Due Date */}
+            <div className="flex items-center gap-1 bg-white/70 p-1 rounded-[3px] border border-[#B3D4FF]/60">
+              <span className="text-[11px] text-[#0747A6] font-bold px-1">Due:</span>
               <input
                 type="date"
-                className="h-7 text-xs border border-blue-200 rounded bg-white px-2 text-gray-700"
+                className="h-6 text-[11px] border border-[#DFE1E6] rounded-[2px] bg-white px-1.5 text-[#172B4D] outline-none cursor-pointer"
                 onChange={(e) => {
                   if (e.target.value) handleBulkDueDateChange(e.target.value)
                 }}
                 disabled={isUpdating}
               />
             </div>
+
+            {/* Deselect */}
+            <button
+              onClick={() => setSelectedTasks(new Set())}
+              className="text-xs text-[#0747A6] hover:underline px-1 cursor-pointer font-medium"
+            >
+              Deselect
+            </button>
           </div>
         </div>
       )}
 
-      {/* Bulk Results Feedback (Requirement 7: reports per task what succeeded, what was rejected and why) */}
+      {/* Bulk Results Feedback Banner (Requirement 7) */}
       {bulkResults.length > 0 && (
-        <div className="p-4 border-b border-gray-200 max-h-56 overflow-y-auto bg-gray-50/80">
+        <div className="border border-[#DFE1E6] rounded-[3px] p-3 max-h-56 overflow-y-auto bg-white shadow-xs">
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-bold text-gray-900">Bulk Action Results ({bulkResults.filter(r => r.success).length} succeeded, {bulkResults.filter(r => !r.success).length} rejected):</h4>
-            <Button variant="ghost" size="sm" className="h-6 text-xs text-gray-500" onClick={() => setBulkResults([])}>Dismiss</Button>
+            <h4 className="text-xs font-bold text-[#172B4D]">
+              Bulk Action Report ({bulkResults.filter(r => r.success).length} succeeded, {bulkResults.filter(r => !r.success).length} rejected):
+            </h4>
+            <button 
+              className="text-xs text-[#5E6C84] hover:text-[#172B4D] cursor-pointer" 
+              onClick={() => setBulkResults([])}
+            >
+              Dismiss
+            </button>
           </div>
-          <ul className="space-y-1.5">
+          <ul className="space-y-1">
             {bulkResults.map(res => (
-              <li key={res.taskId} className="text-xs flex items-start gap-2 bg-white p-2 rounded border">
+              <li key={res.taskId} className="text-xs flex items-start gap-2 p-1.5 rounded-[2px] bg-[#FAFBFC] border border-[#DFE1E6]">
                 {res.success ? (
-                  <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                  <CheckCircle2 className="w-4 h-4 text-[#00875A] mt-0.5 shrink-0" />
                 ) : (
-                  <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                  <AlertCircle className="w-4 h-4 text-[#DE350B] mt-0.5 shrink-0" />
                 )}
                 <div className="flex-1">
-                  <span className="font-semibold text-gray-800">"{getTaskTitle(res.taskId)}"</span>:
-                  <span className={res.success ? " text-green-700 ml-1.5" : " text-red-700 font-medium ml-1.5"}>
-                    {res.success ? 'Action applied successfully' : res.error}
+                  <span className="font-semibold text-[#172B4D]">"{getTaskTitle(res.taskId)}"</span>:
+                  <span className={res.success ? " text-[#00875A] ml-1.5 font-medium" : " text-[#DE350B] font-medium ml-1.5"}>
+                    {res.success ? 'Success' : res.error}
                   </span>
                 </div>
               </li>
@@ -327,97 +438,178 @@ export default function TaskListClient({
         </div>
       )}
 
-      {/* Table */}
-      <Table>
-        <TableHeader className="bg-gray-50/50">
-          <TableRow>
-            <TableHead className="w-12 pl-4">
-              <Checkbox 
-                checked={initialTasks.length > 0 && selectedTasks.size === initialTasks.length}
-                onCheckedChange={toggleAll}
-              />
-            </TableHead>
-            <TableHead>Title</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead 
-              className="cursor-pointer hover:text-gray-900" 
-              onClick={() => updateFilter('sort', currentSort === 'priority' ? 'updated_at' : 'priority')}
-            >
-              Priority {currentSort === 'priority' && '↓'}
-            </TableHead>
-            <TableHead 
-              className="cursor-pointer hover:text-gray-900"
-              onClick={() => updateFilter('sort', currentSort === 'due_date' ? 'updated_at' : 'due_date')}
-            >
-              Due Date {currentSort === 'due_date' && '↓'}
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {initialTasks.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={5} className="h-24 text-center text-gray-500">
-                No tasks found matching your filters.
-              </TableCell>
-            </TableRow>
-          ) : (
-            initialTasks.map((task: any) => (
-              <TableRow key={task.id} className={selectedTasks.has(task.id) ? "bg-blue-50/30" : ""}>
-                <TableCell className="pl-4">
-                  <Checkbox 
-                    checked={selectedTasks.has(task.id)}
-                    onCheckedChange={(c) => toggleTask(task.id, c as boolean)}
-                  />
-                </TableCell>
-                <TableCell className="font-medium text-gray-900">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTaskId(task.id)}
-                    className="text-left font-semibold text-primary hover:underline flex items-center cursor-pointer"
-                  >
-                    {task.title}
-                  </button>
-                  {task.is_blocked && (
-                    <Badge variant="destructive" className="ml-2 text-[10px] h-5">BLOCKED</Badge>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <Badge variant={task.status === 'Done' ? 'default' : 'secondary'} className={task.status === 'Done' ? 'bg-green-600' : 'bg-gray-200 text-gray-800'}>
-                    {task.status}
-                  </Badge>
-                </TableCell>
-                <TableCell>{task.priority}</TableCell>
-                <TableCell className={new Date(task.due_date) < new Date() && task.status !== 'Done' ? "text-red-600 font-medium" : "text-gray-500"}>
-                  {task.due_date ? new Date(task.due_date).toLocaleDateString() : '-'}
-                </TableCell>
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
+      {/* 4. Jira Data Table */}
+      <div className="bg-white border border-[#DFE1E6] rounded-[3px] shadow-2xs overflow-x-auto">
+        <table className="w-full text-left text-xs text-[#172B4D]">
+          <thead className="bg-[#F4F5F7] border-b border-[#DFE1E6] text-[11px] font-bold text-[#5E6C84] uppercase tracking-wider">
+            <tr>
+              <th className="w-10 px-3 py-2.5">
+                <input 
+                  type="checkbox" 
+                  checked={initialTasks.length > 0 && selectedTasks.size === initialTasks.length}
+                  onChange={(e) => toggleAll(e.target.checked)}
+                  className="rounded-[2px] border-[#DFE1E6] text-[#0052CC] focus:ring-[#0052CC] cursor-pointer"
+                />
+              </th>
+              <th className="w-10 px-2 py-2.5">Type</th>
+              <th className="w-28 px-3 py-2.5">Key</th>
+              <th className="px-3 py-2.5">Summary</th>
+              <th className="w-36 px-3 py-2.5">Status</th>
+              <th className="w-44 px-3 py-2.5">Assignee</th>
+              <th 
+                className="w-28 px-3 py-2.5 cursor-pointer hover:text-[#172B4D]"
+                onClick={() => updateFilter('sort', currentSort === 'priority' ? 'updated_at' : 'priority')}
+              >
+                Priority {currentSort === 'priority' && '↓'}
+              </th>
+              <th 
+                className="w-32 px-3 py-2.5 cursor-pointer hover:text-[#172B4D]"
+                onClick={() => updateFilter('sort', currentSort === 'due_date' ? 'updated_at' : 'due_date')}
+              >
+                Due Date {currentSort === 'due_date' && '↓'}
+              </th>
+              <th className="w-28 px-3 py-2.5">Updated</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[#DFE1E6]">
+            {initialTasks.length === 0 ? (
+              <tr>
+                <td colSpan={9} className="h-32 text-center text-[#5E6C84] text-xs">
+                  No issues found matching your filters.
+                </td>
+              </tr>
+            ) : (
+              initialTasks.map((task: any) => {
+                const isSelected = selectedTasks.has(task.id)
+                const issueKey = `${task.projects?.key || 'TASK'}-${task.id.slice(0, 4).toUpperCase()}`
+                const isTaskOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'Done'
+                const assignments = task.task_assignments || []
 
-      {/* Pagination Footer */}
-      <div className="p-4 border-t border-gray-200 flex items-center justify-between text-sm text-gray-500">
+                return (
+                  <tr 
+                    key={task.id} 
+                    className={`hover:bg-[#F4F5F7] transition-colors cursor-pointer group ${
+                      isSelected ? 'bg-[#DEEBFF]/30' : ''
+                    }`}
+                    onClick={() => setActiveTaskId(task.id)}
+                  >
+                    {/* Checkbox */}
+                    <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                      <input 
+                        type="checkbox" 
+                        checked={isSelected}
+                        onChange={(e) => toggleTask(task.id, e.target.checked)}
+                        className="rounded-[2px] border-[#DFE1E6] text-[#0052CC] focus:ring-[#0052CC] cursor-pointer"
+                      />
+                    </td>
+
+                    {/* Type Icon */}
+                    <td className="px-2 py-2.5">
+                      <BusyIssueTypeIcon type="task" size={14} />
+                    </td>
+
+                    {/* Key */}
+                    <td className="px-3 py-2.5 font-mono text-[11px] font-semibold text-[#0052CC] group-hover:underline">
+                      {issueKey}
+                    </td>
+
+                    {/* Summary */}
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-[#172B4D] group-hover:text-[#0052CC] transition-colors line-clamp-1">
+                          {task.title}
+                        </span>
+                        {task.is_blocked && (
+                          <BusyLozenge status="Blocked" isBlocked={true} size="sm" />
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Status */}
+                    <td className="px-3 py-2.5">
+                      <BusyLozenge status={task.status} size="sm" />
+                    </td>
+
+                    {/* Assignee */}
+                    <td className="px-3 py-2.5">
+                      {assignments.length > 0 ? (
+                        <div className="flex items-center gap-2">
+                          <BusyAvatar 
+                            name={assignments[0].profiles?.full_name} 
+                            email={assignments[0].profiles?.email} 
+                            size="xs" 
+                          />
+                          <span className="text-xs text-[#172B4D] truncate max-w-[120px]">
+                            {assignments[0].profiles?.full_name || assignments[0].profiles?.email}
+                          </span>
+                          {assignments.length > 1 && (
+                            <span className="text-[10px] text-[#5E6C84] bg-[#EBECF0] px-1 rounded">
+                              +{assignments.length - 1}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-[#5E6C84] italic">Unassigned</span>
+                      )}
+                    </td>
+
+                    {/* Priority */}
+                    <td className="px-3 py-2.5">
+                      <BusyPriorityIcon priority={task.priority} showLabel={true} size={13} />
+                    </td>
+
+                    {/* Due Date */}
+                    <td className="px-3 py-2.5">
+                      {task.due_date ? (
+                        <span 
+                          suppressHydrationWarning
+                          className={`inline-flex items-center gap-1 text-[11px] font-medium ${
+                            isTaskOverdue ? 'text-[#DE350B] font-semibold' : 'text-[#5E6C84]'
+                          }`}
+                        >
+                          <Calendar className="w-3 h-3" />
+                          {formatFullDate(task.due_date)}
+                        </span>
+                      ) : (
+                        <span className="text-[#5E6C84]">-</span>
+                      )}
+                    </td>
+
+                    {/* Updated */}
+                    <td 
+                      suppressHydrationWarning
+                      className="px-3 py-2.5 text-[#5E6C84] text-[11px]"
+                    >
+                      {task.updated_at ? formatShortDate(task.updated_at) : '-'}
+                    </td>
+                  </tr>
+                )
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* 5. Jira Pagination Footer */}
+      <div className="flex items-center justify-between text-xs text-[#5E6C84] py-2 px-1">
         <div>
-          Showing {Math.min(1 + (currentPage - 1) * 10, totalCount)} to {Math.min(currentPage * 10, totalCount)} of {totalCount} matches
+          Showing <span className="font-semibold text-[#172B4D]">{Math.min(1 + (currentPage - 1) * 10, totalCount)}</span>–<span className="font-semibold text-[#172B4D]">{Math.min(currentPage * 10, totalCount)}</span> of <span className="font-semibold text-[#172B4D]">{totalCount}</span> issues
         </div>
-        <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
+        <div className="flex items-center gap-1.5">
+          <button 
             disabled={currentPage <= 1}
             onClick={() => updateFilter('page', (currentPage - 1).toString())}
+            className="h-7 px-2.5 text-xs font-medium rounded-[3px] border border-[#DFE1E6] bg-[#FAFBFC] hover:bg-[#EBECF0] disabled:opacity-40 disabled:pointer-events-none text-[#42526E] transition-colors flex items-center gap-1 cursor-pointer"
           >
-            <ChevronLeft className="h-4 w-4" /> Previous
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
+            <ChevronLeft className="w-3.5 h-3.5" /> Previous
+          </button>
+          <button 
             disabled={currentPage * 10 >= totalCount}
             onClick={() => updateFilter('page', (currentPage + 1).toString())}
+            className="h-7 px-2.5 text-xs font-medium rounded-[3px] border border-[#DFE1E6] bg-[#FAFBFC] hover:bg-[#EBECF0] disabled:opacity-40 disabled:pointer-events-none text-[#42526E] transition-colors flex items-center gap-1 cursor-pointer"
           >
-            Next <ChevronRight className="h-4 w-4" />
-          </Button>
+            Next <ChevronRight className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
 

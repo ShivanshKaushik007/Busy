@@ -1,7 +1,7 @@
 'use client'
 
-import { Bell, X } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import React, { useState } from 'react'
+import { Bell, X, AlertCircle } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { dismissAlert } from '@/app/actions/alertActions'
-import { useState } from 'react'
+import { formatShortDate } from '@/lib/dateUtils'
 
 export type OverdueAlert = {
   id: string;
@@ -20,65 +20,71 @@ export type OverdueAlert = {
 }
 
 export default function OverdueAlerts({ initialAlerts }: { initialAlerts: OverdueAlert[] }) {
-  // We keep local state for optimistic UI updates (so it disappears instantly when clicked)
   const [alerts, setAlerts] = useState(initialAlerts)
 
   const handleDismiss = async (e: React.MouseEvent, alert: OverdueAlert) => {
-    e.preventDefault() // Stop dropdown from closing if we just want to dismiss one
+    e.preventDefault()
     e.stopPropagation()
-    
-    // Optimistic UI Update
     setAlerts(current => current.filter(a => a.id !== alert.id))
-    
-    // Call server action to permanently record the dismissal
     await dismissAlert(alert.id, alert.due_date)
   }
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="relative flex items-center justify-center h-8 w-8 rounded-full hover:bg-gray-100 text-gray-500 cursor-pointer outline-none">
-        <Bell className="h-5 w-5" />
+      <DropdownMenuTrigger className="relative flex items-center justify-center w-8 h-8 rounded-full hover:bg-[#EBECF0] text-[#42526E] hover:text-[#172B4D] transition-colors cursor-pointer outline-none">
+        <Bell className="w-4 h-4" />
         {alerts.length > 0 && (
-          <span className="absolute top-0 right-0 h-4 w-4 rounded-full bg-red-600 flex items-center justify-center text-[10px] font-bold text-white shadow-sm ring-2 ring-white border border-red-700">
+          <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 rounded-full bg-[#DE350B] flex items-center justify-center text-[10px] font-bold text-white shadow-2xs ring-2 ring-white">
             {alerts.length}
           </span>
         )}
       </DropdownMenuTrigger>
       
-      <DropdownMenuContent align="end" className="w-80">
-        <DropdownMenuLabel className="font-semibold text-gray-900 flex justify-between items-center">
-          Overdue Tasks
-          <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{alerts.length}</span>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
+      <DropdownMenuContent align="end" className="w-80 p-0 rounded-[4px] border border-[#DFE1E6] bg-white shadow-lg overflow-hidden">
+        <div className="px-4 py-3 border-b border-[#DFE1E6] bg-[#FAFBFC] flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-[#172B4D]">Notifications</span>
+            <span className="text-[10px] font-semibold text-[#DE350B] bg-[#FFEBE6] px-1.5 py-0.2 rounded-full border border-[#FFBDAD]/60">
+              {alerts.length} Overdue
+            </span>
+          </div>
+          <span className="text-[11px] text-[#5E6C84]">Assigned to you</span>
+        </div>
         
         {alerts.length === 0 ? (
-          <div className="p-4 text-sm text-gray-500 text-center">
-            You have no overdue tasks. Great job!
+          <div className="p-6 text-xs text-[#5E6C84] text-center">
+            No overdue issues assigned to you. Keep up the momentum!
           </div>
         ) : (
-          <div className="max-h-96 overflow-y-auto">
+          <div className="max-h-80 overflow-y-auto divide-y divide-[#DFE1E6]">
             {alerts.map(alert => (
-              <DropdownMenuItem key={alert.id} className="flex flex-col items-start p-3 focus:bg-gray-50 cursor-default">
-                <div className="flex justify-between items-start w-full gap-2">
-                  <div className="flex flex-col">
-                    <span className="font-medium text-sm text-gray-900 leading-tight mb-1">{alert.title}</span>
-                    <span className="text-xs text-red-600 font-semibold">
-                      Due: {new Date(alert.due_date).toLocaleDateString()}
+              <div 
+                key={alert.id} 
+                className="flex items-start justify-between p-3 hover:bg-[#F4F5F7] transition-colors gap-2"
+              >
+                <div className="flex gap-2.5 flex-1 min-w-0">
+                  <AlertCircle className="w-3.5 h-3.5 text-[#DE350B] shrink-0 mt-0.5" />
+                  <div className="flex flex-col min-w-0">
+                    <span className="font-semibold text-xs text-[#172B4D] leading-tight truncate">
+                      {alert.title}
+                    </span>
+                    <span 
+                      suppressHydrationWarning
+                      className="text-[11px] text-[#DE350B] font-medium mt-0.5"
+                    >
+                      Deadline: {formatShortDate(alert.due_date)}
                     </span>
                   </div>
-                  
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-6 w-6 text-gray-400 hover:text-gray-900 hover:bg-gray-200 shrink-0" 
-                    onClick={(e) => handleDismiss(e, alert)}
-                    title="Dismiss alert"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
                 </div>
-              </DropdownMenuItem>
+                
+                <button 
+                  onClick={(e) => handleDismiss(e, alert)}
+                  className="text-[#5E6C84] hover:text-[#172B4D] hover:bg-[#EBECF0] p-1 rounded-[3px] transition-colors shrink-0 cursor-pointer" 
+                  title="Dismiss notification"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
             ))}
           </div>
         )}

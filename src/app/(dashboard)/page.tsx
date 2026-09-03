@@ -122,24 +122,31 @@ export default async function DashboardPage() {
   ]
 
   return (
-    <div className="space-y-6">
-      
-      {/* Jira-style Breadcrumbs and Header */}
-      <div className="space-y-1">
-        <nav className="text-sm text-gray-500 mb-2">
-          Projects / Company Portfolio / <span className="text-gray-900 font-medium">Dashboard</span>
+    <div className="space-y-5 select-none">
+      {/* Busy Breadcrumbs and Header */}
+      <div>
+        <nav className="text-xs text-[#5E6C84] mb-1 flex items-center gap-1.5 font-medium">
+          <span>Projects</span>
+          <span>/</span>
+          <span>Company Portfolio</span>
+          <span>/</span>
+          <span className="text-[#172B4D] font-semibold">Overview & Velocity</span>
         </nav>
-        <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">Project Overview</h2>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-[#172B4D] tracking-tight">Project Overview</h1>
+          <span className="text-xs font-semibold px-2 py-0.5 rounded-[3px] bg-[#EBECF0] text-[#42526E]">
+            Portfolio Dashboard
+          </span>
+        </div>
       </div>
       
-      {/* Render the Client Component with fetched data */}
+      {/* Render Busy Analytics Gadgets with fetched data */}
       <DashboardCharts 
         metrics={metrics} 
         chartData={chartData} 
         statusData={statusData} 
         assigneeData={assigneeData}
       />
-
     </div>
   )
 }

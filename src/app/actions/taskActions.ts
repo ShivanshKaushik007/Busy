@@ -52,13 +52,36 @@ export async function getTaskDetail(taskId: string) {
     .select(`
       *,
       projects ( id, name, key ),
-      task_assignments ( user_id, profiles ( id, full_name, email ) ),
-      task_dependencies ( blocks_task_id, tasks!task_dependencies_blocks_task_id_fkey ( id, title, status ) )
+      task_assignments ( user_id, profiles ( id, full_name, email ) )
     `)
     .eq('id', taskId)
     .single()
 
-  if (error || !task) return null
+  if (error || !task) {
+    console.error('getTaskDetail error:', error)
+    return null
+  }
+
+  // 1b. Fetch dependencies safely
+  const { data: dependencies } = await supabase
+    .from('task_dependencies')
+    .select('blocks_task_id')
+    .eq('task_id', taskId)
+
+  let taskDependencies: any[] = []
+  if (dependencies && dependencies.length > 0) {
+    const blockerIds = dependencies.map(d => d.blocks_task_id)
+    const { data: blockerTasks } = await supabase
+      .from('tasks')
+      .select('id, title, status')
+      .in('id', blockerIds)
+
+    taskDependencies = dependencies.map(d => ({
+      blocks_task_id: d.blocks_task_id,
+      tasks: blockerTasks?.find(bt => bt.id === d.blocks_task_id)
+    }))
+  }
+  ;(task as any).task_dependencies = taskDependencies
 
   // 2. Timeline history
   const { data: history } = await supabase

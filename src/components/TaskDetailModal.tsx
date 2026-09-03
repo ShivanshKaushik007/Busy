@@ -1,25 +1,42 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { 
-  X, Loader2, AlertCircle, Clock, MessageSquare, 
-  Trash2, ShieldAlert, CheckCircle2, User, Lock, ArrowRight 
+  X, 
+  Loader2, 
+  AlertCircle, 
+  Clock, 
+  MessageSquare, 
+  Trash2, 
+  Lock, 
+  ArrowRight,
+  Plus,
+  History,
+  Calendar,
+  Layers,
+  ChevronDown
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,
 } from '@/components/ui/dialog'
 import { 
-  getTaskDetail, updateTaskStatus, toggleTaskBlocked, 
-  updateTaskDetails, addTaskComment, deleteTask, 
-  addTaskDependency, removeTaskDependency, toggleTaskAssignment 
+  getTaskDetail, 
+  updateTaskStatus, 
+  toggleTaskBlocked, 
+  updateTaskDetails, 
+  addTaskComment, 
+  deleteTask, 
+  addTaskDependency, 
+  removeTaskDependency, 
+  toggleTaskAssignment 
 } from '@/app/actions/taskActions'
 import { TaskPriority, TaskStatus } from '@/lib/types'
+import BusyLozenge from '@/components/busy/BusyLozenge'
+import BusyPriorityIcon from '@/components/busy/BusyPriorityIcon'
+import BusyIssueTypeIcon from '@/components/busy/BusyIssueTypeIcon'
+import BusyAvatar from '@/components/busy/BusyAvatar'
+import { formatDateTime } from '@/lib/dateUtils'
 
 interface TaskDetailModalProps {
   taskId: string | null
@@ -27,7 +44,6 @@ interface TaskDetailModalProps {
   onTaskUpdated?: () => void
 }
 
-// Legal transitions mapped as per requirement 4
 const LEGAL_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
   'Backlog': ['In Progress'],
   'In Progress': ['In Review', 'Backlog'],
@@ -49,6 +65,8 @@ export default function TaskDetailModal({ taskId, onClose, onTaskUpdated }: Task
   const [commentText, setCommentText] = useState('')
   const [submittingComment, setSubmittingComment] = useState(false)
   const [savingDetails, setSavingDetails] = useState(false)
+  const [activityTab, setActivityTab] = useState<'all' | 'comments' | 'history'>('all')
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false)
 
   const loadData = async () => {
     if (!taskId) return
@@ -63,7 +81,7 @@ export default function TaskDetailModal({ taskId, onClose, onTaskUpdated }: Task
       setPriority(res.task.priority || 'Medium')
       setDueDate(res.task.due_date ? res.task.due_date.split('T')[0] : '')
     } else {
-      setError('Could not load task details.')
+      setError('Could not load issue details.')
     }
   }
 
@@ -85,6 +103,7 @@ export default function TaskDetailModal({ taskId, onClose, onTaskUpdated }: Task
   const handleStatusChange = async (newStatus: TaskStatus) => {
     if (!data?.task) return
     setError(null)
+    setStatusDropdownOpen(false)
     const res = await updateTaskStatus(data.task.id, newStatus)
     if (res.error) {
       setError(res.error)
@@ -103,7 +122,7 @@ export default function TaskDetailModal({ taskId, onClose, onTaskUpdated }: Task
     if (res.error) {
       setError(res.error)
     } else {
-      showSuccess(nextBlockedState ? 'Task marked as Blocked' : 'Task Unblocked')
+      showSuccess(nextBlockedState ? 'Issue marked as Blocked' : 'Issue unblocked')
       loadData()
     }
   }
@@ -123,7 +142,7 @@ export default function TaskDetailModal({ taskId, onClose, onTaskUpdated }: Task
     if (res.error) {
       setError(res.error)
     } else {
-      showSuccess('Task details updated')
+      showSuccess('Details updated')
       loadData()
     }
   }
@@ -140,7 +159,7 @@ export default function TaskDetailModal({ taskId, onClose, onTaskUpdated }: Task
       setError(res.error)
     } else {
       setCommentText('')
-      showSuccess('Comment added to timeline')
+      showSuccess('Comment added to issue timeline')
       loadData()
     }
   }
@@ -162,7 +181,7 @@ export default function TaskDetailModal({ taskId, onClose, onTaskUpdated }: Task
   // Handle task deletion (Manager only)
   const handleDelete = async () => {
     if (!data?.task) return
-    if (!confirm('Are you sure you want to delete this task? This action cannot be undone.')) return
+    if (!confirm('Are you sure you want to delete this issue? This action is irreversible.')) return
     const res = await deleteTask(data.task.id)
     if (res.error) {
       setError(res.error)
@@ -175,346 +194,449 @@ export default function TaskDetailModal({ taskId, onClose, onTaskUpdated }: Task
   if (!taskId) return null
 
   const task = data?.task
+  const issueKey = task ? `${task.projects?.key || 'TASK'}-${task.id.slice(0, 4).toUpperCase()}` : ''
   const legalNextStatuses = task ? LEGAL_TRANSITIONS[task.status as TaskStatus] || [] : []
+  const isTaskOverdue = task?.due_date && new Date(task.due_date) < new Date() && task.status !== 'Done'
+
+  // Filter history based on activity tab
+  const historyItems = (data?.history || []).filter((h: any) => {
+    if (activityTab === 'comments') return h.action_type === 'comment'
+    if (activityTab === 'history') return h.action_type !== 'comment'
+    return true
+  })
 
   return (
     <Dialog open={!!taskId} onOpenChange={(open) => { if (!open) onClose() }}>
-      <DialogContent className="max-w-4xl max-h-[92vh] flex flex-col p-0 overflow-hidden">
-        {/* Header Bar */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50/50">
-          <div className="flex items-center gap-2 text-sm">
-            <span className="font-semibold text-primary">
-              {task?.projects?.key || 'TASK'}-{task?.id?.slice(0, 4)}
+      <DialogContent className="max-w-4xl max-h-[92vh] flex flex-col p-0 overflow-hidden bg-white rounded-[4px] border border-[#DFE1E6] shadow-xl">
+        {/* 1. Header Bar */}
+        <div className="flex items-center justify-between px-6 py-3 border-b border-[#DFE1E6] bg-[#FAFBFC]">
+          <div className="flex items-center gap-2 text-xs">
+            <BusyIssueTypeIcon type="task" size={15} />
+            <span className="font-mono font-semibold text-[#0052CC] hover:underline cursor-pointer">
+              {issueKey}
             </span>
-            <span className="text-gray-400">/</span>
-            <span className="text-gray-600 font-medium truncate max-w-xs">{task?.title}</span>
+            <span className="text-[#5E6C84]">/</span>
+            <span className="text-[#5E6C84] font-medium truncate max-w-sm">{task?.title}</span>
             {task?.is_blocked && (
-              <Badge variant="destructive" className="ml-2 text-xs">
-                BLOCKED
-              </Badge>
+              <BusyLozenge status="Blocked" isBlocked={true} size="sm" />
+            )}
+          </div>
+
+          <div className="flex items-center gap-1 pr-6">
+            {data?.isManager && (
+              <button
+                onClick={handleDelete}
+                className="p-1.5 text-[#5E6C84] hover:text-[#DE350B] hover:bg-[#FFEBE6] rounded-[3px] transition-colors cursor-pointer"
+                title="Delete issue (Manager only)"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
             )}
           </div>
         </div>
 
-        {/* Alerts / Error feedback */}
+        {/* Error / Success feedback */}
         {error && (
-          <div className="mx-6 mt-4 p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{error}</span>
+          <div className="mx-6 mt-3 p-2.5 text-xs text-[#DE350B] bg-[#FFEBE6] border border-[#FFBDAD] rounded-[3px] flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 text-[#DE350B]" />
+            <span className="font-medium">{error}</span>
           </div>
         )}
         {successMsg && (
-          <div className="mx-6 mt-4 p-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-md flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
-            <span>{successMsg}</span>
+          <div className="mx-6 mt-3 p-2.5 text-xs text-[#006644] bg-[#E3FCEF] border border-[#ABF5D1] rounded-[3px] flex items-center gap-2">
+            <span className="font-medium">{successMsg}</span>
           </div>
         )}
 
         {loading && !data ? (
-          <div className="p-12 flex items-center justify-center text-gray-500">
-            <Loader2 className="h-6 w-6 animate-spin mr-2" /> Loading issue details...
+          <div className="p-16 flex flex-col items-center justify-center text-[#5E6C84] gap-2">
+            <Loader2 className="w-6 h-6 animate-spin text-[#0052CC]" />
+            <span className="text-xs font-medium">Loading issue details...</span>
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
             
-            {/* Left 2 Columns: Main Info, Comments, Timeline */}
+            {/* 2. Left 2 Columns: Title, Description, Blocker Links, Activity Timeline */}
             <div className="lg:col-span-2 space-y-6">
               
               {/* Title & Description */}
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <Label htmlFor="edit-title" className="text-xs text-gray-500 uppercase tracking-wider">Title</Label>
-                  <Input 
-                    id="edit-title"
+              <div className="space-y-4">
+                <div>
+                  <input
+                    id="busy-issue-title"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    className="font-semibold text-lg"
+                    className="w-full text-xl font-bold text-[#172B4D] p-1.5 rounded-[3px] border border-transparent hover:border-[#DFE1E6] focus:border-[#0052CC] focus:bg-white transition-all outline-none"
+                    placeholder="Issue summary"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <Label htmlFor="edit-desc" className="text-xs text-gray-500 uppercase tracking-wider">Description</Label>
-                  <Textarea 
-                    id="edit-desc"
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-[#5E6C84] uppercase tracking-wider">
+                    Description
+                  </label>
+                  <textarea 
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    rows={3}
+                    rows={4}
                     placeholder="Add a detailed description..."
+                    className="w-full p-2.5 text-xs text-[#172B4D] bg-white border border-[#DFE1E6] focus:border-[#0052CC] focus:ring-1 focus:ring-[#0052CC] rounded-[3px] transition-all outline-none"
                   />
                 </div>
 
                 <div className="flex justify-end">
-                  <Button 
-                    size="sm" 
+                  <button 
                     onClick={handleSaveDetails} 
                     disabled={savingDetails}
-                    className="h-8"
+                    className="bg-[#0052CC] hover:bg-[#0747A6] active:bg-[#0047B3] text-white font-medium text-xs px-3 py-1.5 rounded-[3px] shadow-2xs transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
                   >
-                    {savingDetails ? 'Saving...' : 'Save Changes'}
-                  </Button>
+                    {savingDetails ? 'Saving...' : 'Save changes'}
+                  </button>
                 </div>
               </div>
 
-              {/* Blocking Dependencies Information */}
-              <div className="border-t pt-4">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
-                  Blocked By (Must be resolved before moving to Done)
-                </h4>
+              {/* Linked Issues / Blocked by (Requirement 4 & 9) */}
+              <div className="border-t border-[#DFE1E6] pt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-[11px] font-bold text-[#5E6C84] uppercase tracking-wider">
+                    Blocked By ({task?.task_dependencies?.length || 0})
+                  </h4>
+                  <span className="text-[11px] text-[#5E6C84]">
+                    Must be Done before completing this issue
+                  </span>
+                </div>
+
                 {task?.task_dependencies?.length === 0 ? (
-                  <p className="text-xs text-gray-500">No tasks currently block this issue.</p>
+                  <p className="text-xs text-[#5E6C84] italic bg-[#FAFBFC] p-2.5 rounded-[3px] border border-[#DFE1E6]">
+                    No blocking dependencies on this issue.
+                  </p>
                 ) : (
                   <div className="space-y-1.5">
                     {task?.task_dependencies?.map((dep: any) => (
-                      <div key={dep.blocks_task_id} className="flex items-center justify-between text-sm bg-gray-50 p-2 rounded border">
-                        <div className="flex items-center gap-2">
-                          <Lock className="h-4 w-4 text-amber-500" />
-                          <span className="font-medium text-gray-800">{dep.tasks?.title}</span>
-                          <Badge variant={dep.tasks?.status === 'Done' ? 'default' : 'secondary'} className="text-[10px]">
-                            {dep.tasks?.status}
-                          </Badge>
+                      <div 
+                        key={dep.blocks_task_id} 
+                        className="flex items-center justify-between text-xs bg-[#FAFBFC] hover:bg-[#F4F5F7] p-2 rounded-[3px] border border-[#DFE1E6] transition-colors"
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          <Lock className="w-3.5 h-3.5 text-[#FFAB00] shrink-0" />
+                          <span className="font-medium text-[#172B4D] truncate">{dep.tasks?.title}</span>
+                          <BusyLozenge status={dep.tasks?.status} size="sm" />
                         </div>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-6 text-xs text-gray-400 hover:text-red-600"
-                          onClick={() => {
-                            removeTaskDependency(task.id, dep.blocks_task_id).then(loadData)
-                          }}
+                        <button 
+                          onClick={() => removeTaskDependency(task.id, dep.blocks_task_id).then(loadData)}
+                          className="text-[#5E6C84] hover:text-[#DE350B] p-1 rounded transition-colors text-[11px] cursor-pointer"
+                          title="Remove blocker"
                         >
                           Remove
-                        </Button>
+                        </button>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Activity & Immutable Timeline (Requirement 9) */}
-              <div className="border-t pt-4 space-y-4">
-                <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-gray-500" /> Activity Timeline & Comments
-                </h4>
+              {/* Activity Section with Jira Tabs (Comments & Immutable Timeline) */}
+              <div className="border-t border-[#DFE1E6] pt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-[#172B4D] flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-[#5E6C84]" />
+                    <span>Activity</span>
+                  </h4>
 
-                {/* Comment box */}
-                <form onSubmit={handleAddComment} className="space-y-2">
-                  <Textarea 
-                    placeholder="Leave a comment or progress update..."
+                  {/* Jira Tabs */}
+                  <div className="flex items-center gap-1 text-xs">
+                    <button
+                      onClick={() => setActivityTab('all')}
+                      className={`px-2 py-0.5 rounded-[3px] font-medium transition-colors cursor-pointer ${
+                        activityTab === 'all' 
+                          ? 'bg-[#EBECF0] text-[#172B4D] font-semibold' 
+                          : 'text-[#5E6C84] hover:bg-[#FAFBFC]'
+                      }`}
+                    >
+                      All
+                    </button>
+                    <button
+                      onClick={() => setActivityTab('comments')}
+                      className={`px-2 py-0.5 rounded-[3px] font-medium transition-colors cursor-pointer ${
+                        activityTab === 'comments' 
+                          ? 'bg-[#EBECF0] text-[#172B4D] font-semibold' 
+                          : 'text-[#5E6C84] hover:bg-[#FAFBFC]'
+                      }`}
+                    >
+                      Comments
+                    </button>
+                    <button
+                      onClick={() => setActivityTab('history')}
+                      className={`px-2 py-0.5 rounded-[3px] font-medium transition-colors cursor-pointer ${
+                        activityTab === 'history' 
+                          ? 'bg-[#EBECF0] text-[#172B4D] font-semibold' 
+                          : 'text-[#5E6C84] hover:bg-[#FAFBFC]'
+                      }`}
+                    >
+                      History
+                    </button>
+                  </div>
+                </div>
+
+                {/* Jira Add Comment Box */}
+                <form onSubmit={handleAddComment} className="space-y-2 bg-[#FAFBFC] p-3 rounded-[3px] border border-[#DFE1E6]">
+                  <textarea 
+                    placeholder="Add a comment or progress update..."
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
                     rows={2}
+                    className="w-full p-2 text-xs text-[#172B4D] bg-white border border-[#DFE1E6] focus:border-[#0052CC] focus:ring-1 focus:ring-[#0052CC] rounded-[3px] outline-none transition-all"
                   />
-                  <div className="flex justify-end">
-                    <Button 
+                  <div className="flex justify-end gap-2">
+                    {commentText.trim() && (
+                      <button
+                        type="button"
+                        onClick={() => setCommentText('')}
+                        className="text-xs text-[#5E6C84] hover:text-[#172B4D] px-2 py-1 cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                    <button 
                       type="submit" 
-                      size="sm" 
                       disabled={submittingComment || !commentText.trim()}
-                      className="h-8 gap-1.5"
+                      className="bg-[#0052CC] hover:bg-[#0747A6] active:bg-[#0047B3] text-white font-medium text-xs px-3 py-1 rounded-[3px] shadow-2xs transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
                     >
-                      <MessageSquare className="h-3.5 w-3.5" />
-                      {submittingComment ? 'Posting...' : 'Add Comment'}
-                    </Button>
+                      <MessageSquare className="w-3 h-3" />
+                      <span>{submittingComment ? 'Saving...' : 'Save'}</span>
+                    </button>
                   </div>
                 </form>
 
-                {/* Timeline Stream */}
+                {/* Immutable Timeline Stream (Requirement 9) */}
                 <div className="space-y-3 pt-2">
-                  {data?.history?.length === 0 ? (
-                    <p className="text-xs text-gray-400">No timeline history recorded yet.</p>
+                  {historyItems.length === 0 ? (
+                    <p className="text-xs text-[#5E6C84] italic py-2">No activity recorded for this view.</p>
                   ) : (
-                    data?.history?.map((h: any) => (
-                      <div key={h.id} className="flex gap-3 text-xs border-l-2 border-gray-200 pl-3 py-1">
-                        <div className="w-5 h-5 rounded-full bg-blue-100 text-blue-800 font-bold flex items-center justify-center shrink-0 text-[10px]">
-                          {h.profiles?.full_name?.[0] || 'U'}
-                        </div>
-                        <div className="flex-1 space-y-0.5">
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-gray-900">
-                              {h.profiles?.full_name || h.profiles?.email || 'User'}
-                            </span>
-                            <span className="text-gray-400">
-                              {new Date(h.created_at).toLocaleString()}
-                            </span>
-                          </div>
-
-                          {h.action_type === 'comment' ? (
-                            <div className="p-2 bg-gray-50 rounded text-gray-800 text-sm mt-1 border">
-                              {h.new_value}
+                    historyItems.map((h: any) => {
+                      const userName = h.profiles?.full_name || h.profiles?.email || 'User'
+                      return (
+                        <div key={h.id} className="flex gap-2.5 text-xs py-1">
+                          <BusyAvatar 
+                            name={h.profiles?.full_name} 
+                            email={h.profiles?.email} 
+                            size="sm" 
+                          />
+                          <div className="flex-1 space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-[#172B4D]">{userName}</span>
+                              <span 
+                                suppressHydrationWarning
+                                className="text-[11px] text-[#5E6C84]"
+                              >
+                                {formatDateTime(h.created_at)}
+                              </span>
                             </div>
-                          ) : h.action_type === 'status_change' ? (
-                            <p className="text-gray-600 flex items-center gap-1.5">
-                              Moved status from <Badge variant="outline">{h.old_value}</Badge> to <Badge variant="default">{h.new_value}</Badge>
-                            </p>
-                          ) : h.action_type === 'blocked_change' ? (
-                            <p className="text-gray-600">
-                              {h.new_value === 'true' ? 'Marked task as BLOCKED' : 'UNBLOCKED task'}
-                            </p>
-                          ) : h.action_type === 'created' ? (
-                            <p className="text-gray-600 font-medium">
-                              Created task: <span className="text-gray-900">"{h.new_value}"</span>
-                            </p>
-                          ) : h.action_type === 'assignment' ? (
-                            <p className="text-gray-600 font-medium">
-                              Assigned team member to task
-                            </p>
-                          ) : h.action_type === 'unassignment' ? (
-                            <p className="text-gray-600 font-medium">
-                              Unassigned team member from task
-                            </p>
-                          ) : h.action_type?.startsWith('updated_') ? (
-                            <p className="text-gray-600">
-                              Updated <span className="font-semibold text-gray-800 capitalize">{h.action_type.replace('updated_', '').replace('_', ' ')}</span> from <span className="line-through text-gray-400">{h.old_value || 'None'}</span> to <span className="font-medium text-gray-900">{h.new_value || 'None'}</span>
-                            </p>
-                          ) : (
-                            <p className="text-gray-600">
-                              {h.new_value || h.action_type}
-                            </p>
-                          )}
+
+                            {h.action_type === 'comment' ? (
+                              <div className="p-2.5 bg-[#FAFBFC] rounded-[3px] text-[#172B4D] text-xs border border-[#DFE1E6] leading-relaxed">
+                                {h.new_value}
+                              </div>
+                            ) : h.action_type === 'status_change' ? (
+                              <div className="text-[#5E6C84] flex items-center gap-1.5 flex-wrap">
+                                <span>changed status from</span>
+                                <BusyLozenge status={h.old_value} size="sm" />
+                                <span>to</span>
+                                <BusyLozenge status={h.new_value} size="sm" />
+                              </div>
+                            ) : h.action_type === 'blocked_change' ? (
+                              <p className="text-[#5E6C84]">
+                                {h.new_value === 'true' ? 'marked this issue as BLOCKED' : 'unblocked this issue'}
+                              </p>
+                            ) : h.action_type === 'created' ? (
+                              <p className="text-[#5E6C84]">
+                                created issue <span className="font-semibold text-[#172B4D]">"{h.new_value}"</span>
+                              </p>
+                            ) : h.action_type === 'assignment' ? (
+                              <p className="text-[#5E6C84]">assigned a team member to this issue</p>
+                            ) : h.action_type === 'unassignment' ? (
+                              <p className="text-[#5E6C84]">unassigned a team member from this issue</p>
+                            ) : h.action_type?.startsWith('updated_') ? (
+                              <p className="text-[#5E6C84]">
+                                updated <span className="font-semibold text-[#172B4D] capitalize">{h.action_type.replace('updated_', '').replace('_', ' ')}</span> from <span className="line-through text-[#5E6C84]">{h.old_value || 'None'}</span> to <span className="font-semibold text-[#172B4D]">{h.new_value || 'None'}</span>
+                              </p>
+                            ) : (
+                              <p className="text-[#5E6C84]">{h.new_value || h.action_type}</p>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))
+                      )
+                    })
                   )}
                 </div>
               </div>
 
             </div>
 
-            {/* Right 1 Column: Metadata, Lifecycle Transitions, Details */}
-            <div className="space-y-6 bg-gray-50/50 p-4 rounded-lg border border-gray-200 h-fit">
+            {/* 3. Right 1 Column: Metadata, Jira Status Selector, Assignee, Details */}
+            <div className="space-y-5 bg-[#FAFBFC] p-4 rounded-[4px] border border-[#DFE1E6] h-fit">
               
-              {/* Status Section (State Machine enforcement) */}
+              {/* Status Section & Legal Transitions */}
               <div className="space-y-2">
-                <Label className="text-xs text-gray-500 uppercase font-semibold">Status</Label>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Badge className="text-sm px-2.5 py-1">
-                      Current: {task?.status}
-                    </Badge>
-                    
-                    {/* Blocked Button (Requirement 4) */}
-                    {(task?.status === 'In Progress' || task?.status === 'In Review') && (
-                      <Button
-                        size="sm"
-                        variant={task?.is_blocked ? "destructive" : "outline"}
-                        onClick={handleToggleBlocked}
-                        className="h-7 text-xs"
-                      >
-                        {task?.is_blocked ? 'Unblock Task' : 'Mark Blocked'}
-                      </Button>
-                    )}
-                  </div>
+                <label className="text-[11px] font-bold text-[#5E6C84] uppercase tracking-wider">
+                  Status
+                </label>
 
-                  {/* Strictly Legal Next Moves */}
-                  <div className="pt-2">
-                    <p className="text-xs text-gray-500 mb-1.5 font-medium">Permitted Next Moves:</p>
-                    {legalNextStatuses.length === 0 ? (
-                      <p className="text-xs text-gray-400">No transitions available.</p>
-                    ) : (
-                      <div className="flex flex-wrap gap-1.5">
-                        {legalNextStatuses.map((nextStatus) => (
-                          <Button
-                            key={nextStatus}
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => handleStatusChange(nextStatus)}
-                            className="h-7 text-xs bg-white hover:bg-primary hover:text-white border shadow-2xs gap-1"
-                          >
-                            <ArrowRight className="h-3 w-3" /> {nextStatus}
-                          </Button>
-                        ))}
+                {/* Status Dropdown Button */}
+                <div className="relative">
+                  <button
+                    onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
+                    className="w-full h-8 px-2.5 rounded-[3px] border border-[#DFE1E6] bg-white hover:bg-[#EBECF0] flex items-center justify-between shadow-2xs transition-colors cursor-pointer"
+                  >
+                    <BusyLozenge status={task?.status} size="md" isBlocked={task?.is_blocked} />
+                    <ChevronDown className="w-3.5 h-3.5 text-[#5E6C84]" />
+                  </button>
+
+                  {statusDropdownOpen && (
+                    <div className="absolute left-0 right-0 top-9 z-20 bg-white border border-[#DFE1E6] rounded-[3px] shadow-md p-1 space-y-0.5 animate-in fade-in">
+                      <div className="px-2 py-1 text-[10px] font-bold text-[#5E6C84] uppercase">
+                        Legal Next Transitions
                       </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Priority */}
-              <div className="space-y-1.5">
-                <Label className="text-xs text-gray-500 uppercase font-semibold">Priority</Label>
-                <select
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value as TaskPriority)}
-                  className="w-full h-8 rounded border border-gray-300 bg-white px-2.5 text-xs shadow-2xs focus:ring-1 focus:ring-primary"
-                >
-                  <option value="Low">Low</option>
-                  <option value="Medium">Medium</option>
-                  <option value="High">High</option>
-                  <option value="Urgent">Urgent</option>
-                </select>
-              </div>
-
-              {/* Due Date */}
-              <div className="space-y-1.5">
-                <Label className="text-xs text-gray-500 uppercase font-semibold">Due Date</Label>
-                <Input
-                  type="date"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                  className="h-8 text-xs bg-white"
-                />
-              </div>
-
-              {/* Assignees (Requirement 5: any number of assignees from project members) */}
-              <div className="space-y-2">
-                <Label className="text-xs text-gray-500 uppercase font-semibold">Assignees</Label>
-                <div className="space-y-1.5">
-                  {task?.task_assignments?.length === 0 ? (
-                    <p className="text-xs text-gray-400 italic">No one assigned yet.</p>
-                  ) : (
-                    task?.task_assignments?.map((a: any) => (
-                      <div key={a.user_id} className="flex items-center justify-between gap-1.5 text-xs text-gray-700 bg-white p-1.5 rounded border">
-                        <div className="flex items-center gap-1.5 truncate">
-                          <User className="h-3.5 w-3.5 text-gray-400 shrink-0" />
-                          <span className="truncate">{a.profiles?.full_name || a.profiles?.email}</span>
+                      {legalNextStatuses.length === 0 ? (
+                        <div className="px-2 py-1 text-xs text-[#5E6C84] italic">
+                          No moves available
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => handleToggleAssignment(a.user_id, false)}
-                          className="text-gray-400 hover:text-red-600 transition-colors p-0.5"
-                          title="Unassign"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ))
+                      ) : (
+                        legalNextStatuses.map((nextStatus) => (
+                          <button
+                            key={nextStatus}
+                            onClick={() => handleStatusChange(nextStatus)}
+                            className="w-full text-left px-2 py-1.5 text-xs hover:bg-[#EBECF0] rounded-[2px] flex items-center justify-between transition-colors cursor-pointer"
+                          >
+                            <BusyLozenge status={nextStatus} size="sm" />
+                            <ArrowRight className="w-3 h-3 text-[#5E6C84]" />
+                          </button>
+                        ))
+                      )}
+                    </div>
                   )}
                 </div>
 
-                {/* Add Assignee Dropdown (Only members of project) */}
-                <div className="pt-1">
-                  <select
-                    className="w-full h-8 text-xs border border-gray-200 rounded bg-white px-2 text-gray-700"
-                    value=""
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        handleToggleAssignment(e.target.value, true)
-                      }
-                    }}
+                {/* Block / Unblock Toggle (Requirement 4) */}
+                {(task?.status === 'In Progress' || task?.status === 'In Review') && (
+                  <button
+                    onClick={handleToggleBlocked}
+                    className={`w-full py-1 text-xs font-semibold rounded-[3px] border transition-colors cursor-pointer ${
+                      task?.is_blocked
+                        ? 'bg-[#FFEBE6] text-[#DE350B] border-[#FFBDAD] hover:bg-[#FFD2CC]'
+                        : 'bg-white text-[#42526E] border-[#DFE1E6] hover:bg-[#EBECF0]'
+                    }`}
                   >
-                    <option value="">+ Assign Team Member...</option>
-                    {(data?.projectMembers || [])
-                      .filter((pm: any) => !task?.task_assignments?.some((a: any) => a.user_id === pm.id))
-                      .map((pm: any) => (
-                        <option key={pm.id} value={pm.id}>
-                          {pm.full_name || pm.email}
-                        </option>
-                      ))}
-                  </select>
-                </div>
+                    {task?.is_blocked ? 'Unblock Issue' : 'Mark as Blocked'}
+                  </button>
+                )}
               </div>
 
-              {/* Delete Task Button (Only for Managers) */}
-              {data?.isManager && (
-                <div className="border-t pt-4">
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    className="w-full h-8 text-xs gap-1.5"
-                    onClick={handleDelete}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" /> Delete Task
-                  </Button>
+              {/* Details Section */}
+              <div className="space-y-4 pt-2 border-t border-[#DFE1E6]">
+                <h5 className="text-[11px] font-bold text-[#5E6C84] uppercase tracking-wider">
+                  Details
+                </h5>
+
+                {/* Priority */}
+                <div className="space-y-1">
+                  <span className="text-[11px] font-semibold text-[#5E6C84]">Priority</span>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={priority}
+                      onChange={(e) => setPriority(e.target.value as TaskPriority)}
+                      className="w-full h-7 rounded-[3px] border border-[#DFE1E6] bg-white px-2 text-xs font-medium text-[#172B4D] outline-none cursor-pointer hover:bg-[#EBECF0]"
+                    >
+                      <option value="Low">Low</option>
+                      <option value="Medium">Medium</option>
+                      <option value="High">High</option>
+                      <option value="Urgent">Urgent</option>
+                    </select>
+                  </div>
                 </div>
-              )}
+
+                {/* Due Date */}
+                <div className="space-y-1">
+                  <span className="text-[11px] font-semibold text-[#5E6C84]">Due Date</span>
+                  <input
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    className={`w-full h-7 text-xs border rounded-[3px] bg-white px-2 outline-none cursor-pointer ${
+                      isTaskOverdue ? 'border-[#DE350B] text-[#DE350B] font-semibold' : 'border-[#DFE1E6] text-[#172B4D]'
+                    }`}
+                  />
+                  {isTaskOverdue && (
+                    <span className="text-[10px] font-semibold text-[#DE350B]">
+                      This issue is overdue!
+                    </span>
+                  )}
+                </div>
+
+                {/* Assignees (Requirement 5) */}
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-semibold text-[#5E6C84]">Assignees</span>
+                  <div className="space-y-1">
+                    {task?.task_assignments?.length === 0 ? (
+                      <p className="text-xs text-[#5E6C84] italic">Unassigned</p>
+                    ) : (
+                      task?.task_assignments?.map((a: any) => (
+                        <div 
+                          key={a.user_id} 
+                          className="flex items-center justify-between gap-1.5 text-xs text-[#172B4D] bg-white p-1.5 rounded-[3px] border border-[#DFE1E6]"
+                        >
+                          <div className="flex items-center gap-1.5 truncate">
+                            <BusyAvatar 
+                              name={a.profiles?.full_name} 
+                              email={a.profiles?.email} 
+                              size="xs" 
+                            />
+                            <span className="truncate">{a.profiles?.full_name || a.profiles?.email}</span>
+                          </div>
+                          <button
+                            onClick={() => handleToggleAssignment(a.user_id, false)}
+                            className="text-[#5E6C84] hover:text-[#DE350B] p-0.5 cursor-pointer"
+                            title="Unassign"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Add Assignee Dropdown (Only members of project) */}
+                  <div className="pt-1">
+                    <select
+                      className="w-full h-7 text-xs border border-[#DFE1E6] rounded-[3px] bg-white px-2 text-[#172B4D] outline-none cursor-pointer hover:bg-[#EBECF0]"
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          handleToggleAssignment(e.target.value, true)
+                        }
+                      }}
+                    >
+                      <option value="">+ Assign team member...</option>
+                      {(data?.projectMembers || [])
+                        .filter((pm: any) => !task?.task_assignments?.some((a: any) => a.user_id === pm.id))
+                        .map((pm: any) => (
+                          <option key={pm.id} value={pm.id}>
+                            {pm.full_name || pm.email}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Project Info */}
+                <div className="pt-2 border-t border-[#DFE1E6] space-y-1 text-xs">
+                  <span className="text-[11px] font-semibold text-[#5E6C84]">Project</span>
+                  <div className="font-semibold text-[#172B4D]">
+                    {task?.projects?.name || 'Company Portfolio'} ({task?.projects?.key || 'CP'})
+                  </div>
+                </div>
+
+              </div>
 
             </div>
 
