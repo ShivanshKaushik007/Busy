@@ -1,6 +1,6 @@
 import { ReactNode } from 'react'
 import Link from 'next/link'
-import { LayoutDashboard, CheckSquare, ListTodo, Users, Search, HelpCircle, ChevronDown, Settings, KanbanSquare } from 'lucide-react'
+import { LayoutDashboard, CheckSquare, ListTodo, Users, Search, HelpCircle, ChevronDown, Settings, KanbanSquare, UserCheck } from 'lucide-react'
 import { logout } from '@/app/login/actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -134,6 +134,10 @@ export default async function DashboardLayout({ children }: { children: ReactNod
             <Link href="/tasks" className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded text-gray-700 hover:bg-gray-200/50 dark:text-zinc-300 dark:hover:bg-zinc-800/50 transition-colors">
               <ListTodo className="h-4 w-4 text-gray-500" />
               Issues
+            </Link>
+            <Link href="/tasks?assignedToMe=true" className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded text-gray-700 hover:bg-gray-200/50 dark:text-zinc-300 dark:hover:bg-zinc-800/50 transition-colors">
+              <UserCheck className="h-4 w-4 text-gray-500" />
+              My Tasks
             </Link>
 
             <div className="mt-6 mb-1 px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">

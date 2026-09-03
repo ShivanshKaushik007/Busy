@@ -18,7 +18,9 @@ export default function TaskListClient({
   totalCount, 
   currentPage, 
   currentSort,
-  projects = []
+  projects = [],
+  teamMembers = [],
+  currentUserId
 }: any) {
   const router = useRouter()
   const pathname = usePathname()
@@ -145,9 +147,65 @@ export default function TaskListClient({
             <option value="Done">Done</option>
           </select>
 
-          <Button variant="outline" size="sm" className="h-9" onClick={() => updateFilter('overdue', searchParams.get('overdue') === 'true' ? '' : 'true')}>
+          {/* Assignee Filter (Requirement 5 & 6) */}
+          <select 
+            className="h-9 border border-gray-300 rounded-md bg-white px-3 text-sm text-gray-700"
+            value={searchParams.get('assignee') || (searchParams.get('assignedToMe') === 'true' ? 'me' : '')}
+            onChange={(e) => {
+              if (e.target.value === 'me') {
+                updateFilter('assignedToMe', 'true')
+                updateFilter('assignee', '')
+              } else {
+                updateFilter('assignedToMe', '')
+                updateFilter('assignee', e.target.value)
+              }
+            }}
+          >
+            <option value="">All Assignees</option>
+            <option value="me">Assigned to Me</option>
+            {(teamMembers || []).map((m: any) => (
+              <option key={m.id} value={m.id}>{m.name}</option>
+            ))}
+          </select>
+
+          {/* Priority Filter (Requirement 6) */}
+          <select 
+            className="h-9 border border-gray-300 rounded-md bg-white px-3 text-sm text-gray-700"
+            value={searchParams.get('priority') || ''}
+            onChange={(e) => updateFilter('priority', e.target.value)}
+          >
+            <option value="">All Priorities</option>
+            <option value="Low">Low</option>
+            <option value="Medium">Medium</option>
+            <option value="High">High</option>
+            <option value="Urgent">Urgent</option>
+          </select>
+
+          {/* Quick "My Tasks" Button (Requirement 5) */}
+          <Button 
+            variant={searchParams.get('assignedToMe') === 'true' ? "default" : "outline"} 
+            size="sm" 
+            className="h-9" 
+            onClick={() => updateFilter('assignedToMe', searchParams.get('assignedToMe') === 'true' ? '' : 'true')}
+          >
+            {searchParams.get('assignedToMe') === 'true' ? 'My Tasks (Active)' : 'My Tasks'}
+          </Button>
+
+          {/* Overdue Filter */}
+          <Button variant={searchParams.get('overdue') === 'true' ? "default" : "outline"} size="sm" className="h-9" onClick={() => updateFilter('overdue', searchParams.get('overdue') === 'true' ? '' : 'true')}>
             {searchParams.get('overdue') === 'true' ? 'Clear Overdue' : 'Overdue Only'}
           </Button>
+
+          {/* Sort Selector (Requirement 6: sorting by due date, priority or last update) */}
+          <select 
+            className="h-9 border border-gray-300 rounded-md bg-white px-3 text-sm text-gray-700 font-medium"
+            value={searchParams.get('sort') || currentSort || 'updated_at'}
+            onChange={(e) => updateFilter('sort', e.target.value)}
+          >
+            <option value="updated_at">Sort: Last Update</option>
+            <option value="due_date">Sort: Due Date</option>
+            <option value="priority">Sort: Priority</option>
+          </select>
         </div>
 
         <div className="flex items-center gap-2">

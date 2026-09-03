@@ -17,7 +17,7 @@ import {
 import { 
   getTaskDetail, updateTaskStatus, toggleTaskBlocked, 
   updateTaskDetails, addTaskComment, deleteTask, 
-  addTaskDependency, removeTaskDependency 
+  addTaskDependency, removeTaskDependency, toggleTaskAssignment 
 } from '@/app/actions/taskActions'
 import { TaskPriority, TaskStatus } from '@/lib/types'
 
@@ -142,6 +142,20 @@ export default function TaskDetailModal({ taskId, onClose, onTaskUpdated }: Task
       setCommentText('')
       showSuccess('Comment added to timeline')
       loadData()
+    }
+  }
+
+  // Handle assign / unassign
+  const handleToggleAssignment = async (userId: string, assign: boolean) => {
+    if (!data?.task) return
+    setError(null)
+    const res = await toggleTaskAssignment(data.task.id, userId, assign)
+    if (res.error) {
+      setError(res.error)
+    } else {
+      showSuccess(assign ? 'Assignee added' : 'Assignee removed')
+      loadData()
+      onTaskUpdated?.()
     }
   }
 
@@ -423,20 +437,52 @@ export default function TaskDetailModal({ taskId, onClose, onTaskUpdated }: Task
                 />
               </div>
 
-              {/* Assignees */}
-              <div className="space-y-1.5">
+              {/* Assignees (Requirement 5: any number of assignees from project members) */}
+              <div className="space-y-2">
                 <Label className="text-xs text-gray-500 uppercase font-semibold">Assignees</Label>
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   {task?.task_assignments?.length === 0 ? (
-                    <p className="text-xs text-gray-400">Unassigned</p>
+                    <p className="text-xs text-gray-400 italic">No one assigned yet.</p>
                   ) : (
                     task?.task_assignments?.map((a: any) => (
-                      <div key={a.user_id} className="flex items-center gap-1.5 text-xs text-gray-700 bg-white p-1.5 rounded border">
-                        <User className="h-3.5 w-3.5 text-gray-400" />
-                        <span>{a.profiles?.full_name || a.profiles?.email}</span>
+                      <div key={a.user_id} className="flex items-center justify-between gap-1.5 text-xs text-gray-700 bg-white p-1.5 rounded border">
+                        <div className="flex items-center gap-1.5 truncate">
+                          <User className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                          <span className="truncate">{a.profiles?.full_name || a.profiles?.email}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleAssignment(a.user_id, false)}
+                          className="text-gray-400 hover:text-red-600 transition-colors p-0.5"
+                          title="Unassign"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                     ))
                   )}
+                </div>
+
+                {/* Add Assignee Dropdown (Only members of project) */}
+                <div className="pt-1">
+                  <select
+                    className="w-full h-8 text-xs border border-gray-200 rounded bg-white px-2 text-gray-700"
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        handleToggleAssignment(e.target.value, true)
+                      }
+                    }}
+                  >
+                    <option value="">+ Assign Team Member...</option>
+                    {(data?.projectMembers || [])
+                      .filter((pm: any) => !task?.task_assignments?.some((a: any) => a.user_id === pm.id))
+                      .map((pm: any) => (
+                        <option key={pm.id} value={pm.id}>
+                          {pm.full_name || pm.email}
+                        </option>
+                      ))}
+                  </select>
                 </div>
               </div>
 

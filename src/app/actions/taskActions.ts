@@ -474,6 +474,65 @@ export async function addTaskComment(taskId: string, commentText: string) {
   return { success: true }
 }
 
+// 8. Assign / Unassign user to task
+// "Only members of a task's project may be assigned to it"
+export async function toggleTaskAssignment(taskId: string, userId: string, assign: boolean) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  // 1. Check task exists and get project_id
+  const { data: task } = await supabase.from('tasks').select('project_id, title').eq('id', taskId).single()
+  if (!task) return { error: 'Task not found' }
+
+  // 2. Enforce: "Only members of a task's project may be assigned to it"
+  if (assign) {
+    const { data: membership } = await supabase
+      .from('project_members')
+      .select('user_id')
+      .eq('project_id', task.project_id)
+      .eq('user_id', userId)
+      .single()
+
+    if (!membership) {
+      return { error: 'User is not a member of this project and cannot be assigned to this task.' }
+    }
+
+    const { error: insErr } = await supabase.from('task_assignments').upsert({ task_id: taskId, user_id: userId })
+    if (insErr) return { error: insErr.message }
+
+    // Log history
+    await supabase.from('task_history').insert({
+      task_id: taskId,
+      actor_id: user.id,
+      action_type: 'assignment',
+      old_value: null,
+      new_value: `Assigned user to task`
+    })
+  } else {
+    const { error: delErr } = await supabase
+      .from('task_assignments')
+      .delete()
+      .eq('task_id', taskId)
+      .eq('user_id', userId)
+
+    if (delErr) return { error: delErr.message }
+
+    // Log history
+    await supabase.from('task_history').insert({
+      task_id: taskId,
+      actor_id: user.id,
+      action_type: 'unassignment',
+      old_value: userId,
+      new_value: null
+    })
+  }
+
+  revalidatePath('/', 'layout')
+  revalidatePath('/tasks')
+  return { success: true }
+}
+
 // 7. Add & Remove Dependencies
 export async function addTaskDependency(taskId: string, blockerTaskId: string) {
   const supabase = await createClient()
