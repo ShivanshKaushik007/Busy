@@ -11,7 +11,8 @@ import {
   FolderKanban,
   ChevronLeft, 
   ChevronRight,
-  Info
+  Info,
+  Activity
 } from 'lucide-react'
 
 interface BusySidebarProps {
@@ -99,6 +100,19 @@ export default function BusySidebar({
             >
               <ListTodo className="w-4 h-4 shrink-0 text-inherit" />
               {!collapsed && <span>Issues</span>}
+            </Link>
+
+            <Link
+              href="/activity"
+              className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-[3px] text-[13px] font-medium transition-colors ${
+                isLinkActive('/activity')
+                  ? 'bg-[#DEEBFF] text-[#0052CC] font-semibold border-l-3 border-[#0052CC] pl-2'
+                  : 'text-[#42526E] hover:bg-[#EBECF0] hover:text-[#172B4D]'
+              }`}
+              title="Activity Feed"
+            >
+              <Activity className="w-4 h-4 shrink-0 text-inherit" />
+              {!collapsed && <span>Activity Feed</span>}
             </Link>
           </div>
         </div>

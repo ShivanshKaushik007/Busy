@@ -19,7 +19,8 @@ import {
   Keyboard,
   ArrowRight,
   Sparkles,
-  X
+  X,
+  Activity
 } from 'lucide-react'
 
 interface PaletteItem {
@@ -106,6 +107,15 @@ export default function CommandPalette({
       icon: Users,
       shortcut: ['g', 't'],
       onSelect: () => router.push('/teams')
+    },
+    {
+      id: 'nav-activity',
+      title: 'Activity Feed',
+      subtitle: 'Real-time updates, comments & transitions across all projects',
+      category: 'Navigation',
+      icon: Activity,
+      shortcut: ['g', 'a'],
+      onSelect: () => router.push('/activity')
     },
 
     // Actions

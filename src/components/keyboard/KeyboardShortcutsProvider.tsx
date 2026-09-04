@@ -113,6 +113,11 @@ export default function KeyboardShortcutsProvider({
           router.push('/teams')
           return
         }
+        if (key === 'a') {
+          e.preventDefault()
+          router.push('/activity')
+          return
+        }
       }
 
       // Single-key global shortcuts

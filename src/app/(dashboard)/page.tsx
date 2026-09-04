@@ -1,3 +1,5 @@
+import Link from 'next/link'
+import { Activity } from 'lucide-react'
 import { createClient } from '@/utils/supabase/server'
 import DashboardCharts from '@/components/DashboardCharts'
 import { verifyManagerRole } from '@/app/actions/projectActions'
@@ -134,9 +136,18 @@ export default async function DashboardPage() {
         </nav>
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-[#172B4D] tracking-tight">Project Overview</h1>
-          <span className="text-xs font-semibold px-2 py-0.5 rounded-[3px] bg-[#EBECF0] text-[#42526E]">
-            Portfolio Dashboard
-          </span>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/activity"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-[3px] bg-white border border-[#DFE1E6] hover:bg-[#FAFBFC] text-[#0052CC] shadow-2xs transition-colors"
+            >
+              <Activity className="w-3.5 h-3.5" />
+              <span>Activity Feed</span>
+            </Link>
+            <span className="text-xs font-semibold px-2 py-1 rounded-[3px] bg-[#EBECF0] text-[#42526E]">
+              Portfolio Dashboard
+            </span>
+          </div>
         </div>
       </div>
       
