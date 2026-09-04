@@ -428,6 +428,7 @@ export async function updateTaskStatus(taskId: string, newStatus: TaskStatus) {
 
   revalidatePath('/', 'layout')
   revalidatePath('/tasks')
+  revalidatePath('/board')
   return { success: true }
 }
 

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
@@ -13,7 +13,8 @@ import {
   MoreHorizontal,
   Clock,
   Filter,
-  X
+  X,
+  GripVertical
 } from 'lucide-react'
 import TaskDetailModal from '@/components/TaskDetailModal'
 import CreateTaskDialog from '@/components/CreateTaskDialog'
@@ -57,6 +58,7 @@ export default function BoardClient({
   currentUserId?: string
 }) {
   const router = useRouter()
+  const [tasks, setTasks] = useState<any[]>(initialTasks)
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedProject, setSelectedProject] = useState<string>(defaultProject)
@@ -66,10 +68,117 @@ export default function BoardClient({
   const [error, setError] = useState<string | null>(null)
   const [createColumnStatus, setCreateColumnStatus] = useState<TaskStatus | null>(null)
 
-  // Extract distinct assignees across initial tasks for the Jira quick-avatar filters
+  // Drag-and-Drop state
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
+  const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null)
+  const isDraggingRef = useRef(false)
+
+  // Sync tasks when server initialTasks changes
+  useEffect(() => {
+    setTasks(initialTasks)
+  }, [initialTasks])
+
+  // Current dragged task
+  const draggedTask = useMemo(() => {
+    if (!draggedTaskId) return null
+    return tasks.find(t => t.id === draggedTaskId) || null
+  }, [draggedTaskId, tasks])
+
+  // Check if a column is a legal drop destination for currently dragged task
+  const isLegalTarget = (colId: TaskStatus) => {
+    if (!draggedTask) return false
+    if (draggedTask.status === colId) return false
+    if (draggedTask.is_blocked) return false
+    const allowed = NEXT_MOVES[draggedTask.status as TaskStatus] || []
+    return allowed.includes(colId)
+  }
+
+  // Drag Event Handlers
+  const handleDragStart = (e: React.DragEvent, task: any) => {
+    e.dataTransfer.setData('text/plain', task.id)
+    e.dataTransfer.effectAllowed = 'move'
+    setDraggedTaskId(task.id)
+    isDraggingRef.current = true
+    setError(null)
+  }
+
+  const handleDragEnd = () => {
+    setDraggedTaskId(null)
+    setDragOverColumn(null)
+    setTimeout(() => {
+      isDraggingRef.current = false
+    }, 150)
+  }
+
+  const handleDragOver = (e: React.DragEvent, colId: TaskStatus) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    if (dragOverColumn !== colId) {
+      setDragOverColumn(colId)
+    }
+  }
+
+  const handleDragLeave = (e: React.DragEvent, colId: TaskStatus) => {
+    const related = e.relatedTarget as Node | null
+    if (related && (e.currentTarget as HTMLElement).contains(related)) {
+      return
+    }
+    if (dragOverColumn === colId) {
+      setDragOverColumn(null)
+    }
+  }
+
+  const handleDrop = async (e: React.DragEvent, targetColId: TaskStatus) => {
+    e.preventDefault()
+    const taskId = e.dataTransfer.getData('text/plain') || draggedTaskId
+    handleDragEnd()
+
+    if (!taskId) return
+    const task = tasks.find(t => t.id === taskId)
+    if (!task) return
+    if (task.status === targetColId) return
+
+    // 1. Validate blocked tasks
+    if (task.is_blocked) {
+      setError('Cannot move task: Task is currently marked as Blocked. You must unblock it before changing its status.')
+      setTimeout(() => setError(null), 6000)
+      return
+    }
+
+    // 2. Validate legal transition rule
+    const allowed = NEXT_MOVES[task.status as TaskStatus] || []
+    if (!allowed.includes(targetColId)) {
+      setError(`Illegal move: Cannot move task from "${task.status}" directly to "${targetColId}". Permitted moves: ${allowed.join(', ') || 'None'}.`)
+      setTimeout(() => setError(null), 6000)
+      return
+    }
+
+    // 3. Optimistic update
+    const prevTasks = [...tasks]
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: targetColId, updated_at: new Date().toISOString() } : t))
+    setError(null)
+
+    // 4. Server Action call
+    const res = await updateTaskStatus(taskId, targetColId)
+    if (res?.error) {
+      // Rollback on server error
+      setTasks(prevTasks)
+      setError(res.error)
+      setTimeout(() => setError(null), 6000)
+    } else {
+      router.refresh()
+    }
+  }
+
+  const handleCardClick = (taskId: string) => {
+    if (isDraggingRef.current) return
+    setActiveTaskId(taskId)
+  }
+
+  // Extract distinct assignees across tasks for the Jira quick-avatar filters
   const assignees = useMemo(() => {
     const map = new Map<string, { id: string; name: string; email: string }>()
-    for (const t of initialTasks) {
+    for (const t of tasks) {
       for (const a of t.task_assignments || []) {
         if (a.profiles && !map.has(a.profiles.id)) {
           map.set(a.profiles.id, {
@@ -81,13 +190,19 @@ export default function BoardClient({
       }
     }
     return Array.from(map.values())
-  }, [initialTasks])
+  }, [tasks])
 
   const handleQuickMove = async (e: React.MouseEvent, taskId: string, newStatus: TaskStatus) => {
     e.stopPropagation()
     setError(null)
+
+    // Optimistic update
+    const prevTasks = [...tasks]
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus, updated_at: new Date().toISOString() } : t))
+
     const res = await updateTaskStatus(taskId, newStatus)
-    if (res.error) {
+    if (res?.error) {
+      setTasks(prevTasks)
       setError(res.error)
       setTimeout(() => setError(null), 6000)
     } else {
@@ -100,7 +215,7 @@ export default function BoardClient({
     const now = new Date().getTime()
     const oneDayAgo = now - 24 * 60 * 60 * 1000
 
-    return initialTasks.filter(t => {
+    return tasks.filter(t => {
       // Search
       const matchesSearch = !searchQuery || 
         t.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -126,7 +241,7 @@ export default function BoardClient({
 
       return matchesSearch && matchesProject && matchesAssignee && matchesRecent
     })
-  }, [initialTasks, searchQuery, selectedProject, selectedAssignee, onlyMyIssues, recentOnly, currentUserId])
+  }, [tasks, searchQuery, selectedProject, selectedAssignee, onlyMyIssues, recentOnly, currentUserId])
 
   const activeProjectData = projects.find(p => p.id === selectedProject)
   const isAnyFilterActive = searchQuery || selectedProject || selectedAssignee || onlyMyIssues || recentOnly
@@ -273,15 +388,29 @@ export default function BoardClient({
         </div>
       )}
 
-      {/* 3. Jira Kanban 4-Column Board */}
+      {/* 3. Jira Kanban 4-Column Board with Drag & Drop */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 flex-1 items-start min-h-[580px]">
         {COLUMNS.map(col => {
           const colTasks = filteredTasks.filter(t => t.status === col.id)
+          const isValidTarget = isLegalTarget(col.id)
+          const isHovered = dragOverColumn === col.id
+          const isSourceCol = draggedTask?.status === col.id
 
           return (
             <div 
               key={col.id} 
-              className="bg-[#F4F5F7] border border-[#DFE1E6] rounded-[4px] p-2 flex flex-col min-h-[560px]"
+              onDragOver={(e) => handleDragOver(e, col.id)}
+              onDragLeave={(e) => handleDragLeave(e, col.id)}
+              onDrop={(e) => handleDrop(e, col.id)}
+              className={`rounded-[4px] p-2 flex flex-col min-h-[560px] transition-all duration-150 ${
+                isHovered && isValidTarget
+                  ? 'bg-[#DEEBFF]/40 border-2 border-dashed border-[#0052CC] shadow-sm'
+                  : isHovered && !isValidTarget && !isSourceCol
+                  ? 'bg-[#FFEBE6]/30 border-2 border-dashed border-[#DE350B]/60'
+                  : isValidTarget
+                  ? 'bg-[#F4F8FD] border-2 border-dashed border-[#0052CC]/40'
+                  : 'bg-[#F4F5F7] border border-[#DFE1E6]'
+              }`}
             >
               {/* Column Header */}
               <div className="flex items-center justify-between px-1.5 py-1 mb-2">
@@ -292,6 +421,16 @@ export default function BoardClient({
                   <span className="text-[11px] font-semibold px-1.5 py-0.2 rounded-full bg-[#DFE1E6] text-[#42526E]">
                     {colTasks.length}
                   </span>
+                  {draggedTask && isValidTarget && (
+                    <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded-[2px] bg-[#DEEBFF] text-[#0052CC] animate-pulse">
+                      Valid move
+                    </span>
+                  )}
+                  {draggedTask && isHovered && !isValidTarget && !isSourceCol && (
+                    <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded-[2px] bg-[#FFEBE6] text-[#DE350B]">
+                      Illegal
+                    </span>
+                  )}
                 </div>
                 <button 
                   className="p-1 text-[#5E6C84] hover:text-[#172B4D] hover:bg-[#EBECF0] rounded-[3px] transition-colors cursor-pointer"
@@ -303,7 +442,14 @@ export default function BoardClient({
 
               {/* Column Task Cards */}
               <div className="space-y-2 flex-1">
-                {colTasks.length === 0 ? (
+                {/* Drop placeholder indicator when hovered over valid target */}
+                {isHovered && isValidTarget && (
+                  <div className="h-14 border-2 border-dashed border-[#0052CC] bg-[#DEEBFF]/50 rounded-[3px] flex items-center justify-center text-xs font-semibold text-[#0052CC] animate-pulse">
+                    Drop issue here
+                  </div>
+                )}
+
+                {colTasks.length === 0 && (!isHovered || !isValidTarget) ? (
                   <div className="h-28 border border-dashed border-[#DFE1E6] rounded-[3px] flex flex-col items-center justify-center text-xs text-[#5E6C84] bg-white/50">
                     <span>No issues</span>
                   </div>
@@ -312,16 +458,27 @@ export default function BoardClient({
                     const issueKey = `${task.projects?.key || 'TASK'}-${task.id.slice(0, 4).toUpperCase()}`
                     const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'Done'
                     const assignments = task.task_assignments || []
+                    const isBeingDragged = draggedTaskId === task.id
 
                     return (
                       <div 
                         key={task.id}
-                        onClick={() => setActiveTaskId(task.id)}
-                        className="bg-white rounded-[3px] border border-[#DFE1E6] p-3 shadow-2xs hover:shadow-xs hover:border-[#4C9AFF] transition-all cursor-pointer group space-y-2"
+                        draggable={true}
+                        onDragStart={(e) => handleDragStart(e, task)}
+                        onDragEnd={handleDragEnd}
+                        onClick={() => handleCardClick(task.id)}
+                        className={`bg-white rounded-[3px] border p-3 transition-all cursor-grab active:cursor-grabbing select-none group space-y-2 ${
+                          isBeingDragged
+                            ? 'opacity-30 border-dashed border-[#0052CC] scale-[0.98] shadow-inner bg-[#F4F5F7]'
+                            : 'border-[#DFE1E6] shadow-2xs hover:shadow-xs hover:border-[#4C9AFF]'
+                        }`}
                       >
-                        {/* Title / Summary */}
-                        <div className="text-[13px] font-medium text-[#172B4D] group-hover:text-[#0052CC] leading-snug line-clamp-3 transition-colors">
-                          {task.title}
+                        {/* Title / Summary with Grip handle */}
+                        <div className="flex items-start justify-between gap-1">
+                          <div className="text-[13px] font-medium text-[#172B4D] group-hover:text-[#0052CC] leading-snug line-clamp-3 transition-colors flex-1">
+                            {task.title}
+                          </div>
+                          <GripVertical className="w-3.5 h-3.5 text-[#5E6C84] opacity-30 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5" />
                         </div>
 
                         {/* Status Badges / Blocked */}
