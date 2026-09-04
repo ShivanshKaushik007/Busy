@@ -2,11 +2,10 @@
 
 import React, { useState } from 'react'
 import Link from 'next/link'
-import { usePathname, useSearchParams } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { 
   Columns3, 
   ListTodo, 
-  UserCheck, 
   LayoutDashboard, 
   Users, 
   FolderKanban,
@@ -27,13 +26,9 @@ export default function BusySidebar({
   projectKey = 'CP'
 }: BusySidebarProps) {
   const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const isAssignedToMe = searchParams.get('assignedToMe') === 'true'
   const [collapsed, setCollapsed] = useState(false)
 
-  const isLinkActive = (path: string, exact: boolean = false, checkParam: boolean = false) => {
-    if (checkParam) return pathname === '/tasks' && isAssignedToMe
-    if (path === '/tasks' && isAssignedToMe) return false
+  const isLinkActive = (path: string, exact: boolean = false) => {
     if (exact) return pathname === path
     return pathname.startsWith(path)
   }
@@ -96,27 +91,14 @@ export default function BusySidebar({
             <Link
               href="/tasks"
               className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-[3px] text-[13px] font-medium transition-colors ${
-                isLinkActive('/tasks', true)
+                isLinkActive('/tasks')
                   ? 'bg-[#DEEBFF] text-[#0052CC] font-semibold border-l-3 border-[#0052CC] pl-2'
                   : 'text-[#42526E] hover:bg-[#EBECF0] hover:text-[#172B4D]'
               }`}
-              title="All Issues"
+              title="Issues"
             >
               <ListTodo className="w-4 h-4 shrink-0 text-inherit" />
               {!collapsed && <span>Issues</span>}
-            </Link>
-
-            <Link
-              href="/tasks?assignedToMe=true"
-              className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-[3px] text-[13px] font-medium transition-colors ${
-                isLinkActive('/tasks', false, true)
-                  ? 'bg-[#DEEBFF] text-[#0052CC] font-semibold border-l-3 border-[#0052CC] pl-2'
-                  : 'text-[#42526E] hover:bg-[#EBECF0] hover:text-[#172B4D]'
-              }`}
-              title="My Tasks"
-            >
-              <UserCheck className="w-4 h-4 shrink-0 text-inherit" />
-              {!collapsed && <span>My Tasks</span>}
             </Link>
           </div>
         </div>

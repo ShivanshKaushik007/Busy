@@ -1,6 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
-import TeamsClient from './TeamsClient'
+import TeamsClient from '@/app/(dashboard)/teams/TeamsClient'
 import { verifyManagerRole } from '@/app/actions/projectActions'
 
 export default async function TeamsPage() {

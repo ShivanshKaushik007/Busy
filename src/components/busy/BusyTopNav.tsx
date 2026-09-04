@@ -5,8 +5,19 @@ import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { 
   Search, 
-  Plus 
+  Plus,
+  ShieldCheck,
+  User,
+  UserCheck,
+  FolderKanban,
+  Users,
+  LogOut
 } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { logout } from '@/app/login/actions'
 import OverdueAlerts, { OverdueAlert } from '@/components/OverdueAlerts'
 import CreateTaskDialog from '@/components/CreateTaskDialog'
@@ -60,15 +71,6 @@ export default function BusyTopNav({
         {/* Top Nav Menus */}
         <nav className="hidden md:flex items-center space-x-1 h-full text-[13px] font-medium text-[#42526E]">
           <Link
-            href="/"
-            className={`px-2.5 py-1.5 rounded-[3px] transition-colors ${
-              pathname === '/' ? 'text-[#0052CC] font-semibold bg-[#EBECF0]' : 'hover:bg-[#EBECF0] hover:text-[#172B4D]'
-            }`}
-          >
-            Your work
-          </Link>
-
-          <Link
             href="/projects"
             className={`px-2.5 py-1.5 rounded-[3px] transition-colors ${
               pathname.startsWith('/projects') ? 'text-[#0052CC] font-semibold bg-[#EBECF0]' : 'hover:bg-[#EBECF0] hover:text-[#172B4D]'
@@ -87,9 +89,9 @@ export default function BusyTopNav({
           </Link>
 
           <Link
-            href="/board"
+            href="/"
             className={`px-2.5 py-1.5 rounded-[3px] transition-colors ${
-              pathname.startsWith('/board') ? 'text-[#0052CC] font-semibold bg-[#EBECF0]' : 'hover:bg-[#EBECF0] hover:text-[#172B4D]'
+              pathname === '/' ? 'text-[#0052CC] font-semibold bg-[#EBECF0]' : 'hover:bg-[#EBECF0] hover:text-[#172B4D]'
             }`}
           >
             Dashboards
@@ -140,20 +142,88 @@ export default function BusyTopNav({
 
 
 
-        {/* User Avatar with Sign Out */}
-        <form action={logout} className="flex items-center">
-          <button
-            type="submit"
-            className="group relative flex items-center gap-1.5 p-0.5 rounded-full hover:ring-2 hover:ring-[#0052CC]/40 transition-all cursor-pointer"
-            title={`Signed in as ${userFullName || userEmail || 'User'} (${userRole || 'Member'})\nClick to Sign Out`}
-          >
+        {/* User Profile Dropdown Menu */}
+        <DropdownMenu>
+          <DropdownMenuTrigger className="group relative flex items-center p-0.5 rounded-full hover:ring-2 hover:ring-[#0052CC]/40 transition-all cursor-pointer outline-none">
             <BusyAvatar 
               name={userFullName} 
               email={userEmail} 
               size="sm"
             />
-          </button>
-        </form>
+          </DropdownMenuTrigger>
+
+          <DropdownMenuContent align="end" className="w-72 p-0 rounded-[4px] border border-[#DFE1E6] bg-white shadow-xl overflow-hidden z-50">
+            {/* User Profile Header */}
+            <div className="p-4 bg-[#FAFBFC] border-b border-[#DFE1E6]">
+              <div className="flex items-start gap-3">
+                <BusyAvatar 
+                  name={userFullName} 
+                  email={userEmail} 
+                  size="md" 
+                />
+                <div className="overflow-hidden flex-1 leading-tight">
+                  <div className="font-bold text-sm text-[#172B4D] truncate">
+                    {userFullName || 'User'}
+                  </div>
+                  <div className="text-xs text-[#5E6C84] truncate mt-0.5">
+                    {userEmail || 'No email provided'}
+                  </div>
+                  <div className="mt-2">
+                    {userRole === 'manager' ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-[3px] bg-[#E3FCEF] text-[#006644] border border-[#ABF5D1]">
+                        <ShieldCheck className="w-3 h-3" />
+                        <span>Workspace Manager</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-[3px] bg-[#EBECF0] text-[#42526E]">
+                        <User className="w-3 h-3" />
+                        <span>Team Member</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Links */}
+            <div className="p-1.5 text-xs text-[#172B4D]">
+              <Link
+                href="/tasks?assignedToMe=true"
+                className="flex items-center gap-2.5 px-3 py-2 rounded-[3px] hover:bg-[#EBECF0] hover:text-[#0052CC] transition-colors"
+              >
+                <UserCheck className="w-4 h-4 text-[#5E6C84]" />
+                <span className="font-medium">My Assigned Tasks</span>
+              </Link>
+              <Link
+                href="/projects"
+                className="flex items-center gap-2.5 px-3 py-2 rounded-[3px] hover:bg-[#EBECF0] hover:text-[#0052CC] transition-colors"
+              >
+                <FolderKanban className="w-4 h-4 text-[#5E6C84]" />
+                <span className="font-medium">My Projects</span>
+              </Link>
+              <Link
+                href="/teams"
+                className="flex items-center gap-2.5 px-3 py-2 rounded-[3px] hover:bg-[#EBECF0] hover:text-[#0052CC] transition-colors"
+              >
+                <Users className="w-4 h-4 text-[#5E6C84]" />
+                <span className="font-medium">Teams & People</span>
+              </Link>
+            </div>
+
+            {/* Sign Out Action */}
+            <div className="p-1.5 border-t border-[#DFE1E6] bg-[#FAFBFC]">
+              <form action={logout}>
+                <button
+                  type="submit"
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-[3px] text-xs font-semibold text-[#DE350B] hover:bg-[#FFEBE6] transition-colors cursor-pointer text-left"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Log out</span>
+                </button>
+              </form>
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   )
