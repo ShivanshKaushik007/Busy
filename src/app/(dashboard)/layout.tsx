@@ -4,6 +4,7 @@ import { OverdueAlert } from '@/components/OverdueAlerts'
 import BusyTopNav from '@/components/busy/BusyTopNav'
 import BusySidebar from '@/components/busy/BusySidebar'
 import { getUserProjects } from '@/app/actions/taskActions'
+import KeyboardShortcutsProvider from '@/components/keyboard/KeyboardShortcutsProvider'
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const supabase = await createClient()
@@ -59,30 +60,32 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   }
 
   return (
-    <div className="flex flex-col h-screen bg-[#FAFBFC] font-sans antialiased text-[#172B4D]">
-      {/* 1. Global Busy Top Navigation Bar */}
-      <BusyTopNav 
-        alerts={alerts} 
-        userEmail={user?.email || userProfile?.email} 
-        userFullName={userProfile?.full_name} 
-        userRole={userProfile?.role}
-      />
-
-      <div className="flex flex-1 overflow-hidden">
-        {/* 2. Collapsible Busy Project Sidebar */}
-        <BusySidebar 
+    <KeyboardShortcutsProvider>
+      <div className="flex flex-col h-screen bg-[#FAFBFC] font-sans antialiased text-[#172B4D]">
+        {/* 1. Global Busy Top Navigation Bar */}
+        <BusyTopNav 
+          alerts={alerts} 
+          userEmail={user?.email || userProfile?.email} 
+          userFullName={userProfile?.full_name} 
           userRole={userProfile?.role}
-          projectName={defaultProjectName}
-          projectKey={defaultProjectKey}
         />
 
-        {/* 3. Main Busy Canvas Area */}
-        <main className="flex-1 flex flex-col overflow-hidden bg-white">
-          <div className="flex-1 overflow-y-auto p-6 lg:p-8">
-            {children}
-          </div>
-        </main>
+        <div className="flex flex-1 overflow-hidden">
+          {/* 2. Collapsible Busy Project Sidebar */}
+          <BusySidebar 
+            userRole={userProfile?.role}
+            projectName={defaultProjectName}
+            projectKey={defaultProjectKey}
+          />
+
+          {/* 3. Main Busy Canvas Area */}
+          <main className="flex-1 flex flex-col overflow-hidden bg-white">
+            <div className="flex-1 overflow-y-auto p-6 lg:p-8">
+              {children}
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </KeyboardShortcutsProvider>
   )
 }

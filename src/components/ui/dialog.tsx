@@ -63,7 +63,15 @@ export function DialogTrigger({ children, asChild, ...props }: React.ButtonHTMLA
   )
 }
 
-export function DialogContent({ children, className }: { children: React.ReactNode; className?: string }) {
+export function DialogContent({ 
+  children, 
+  className,
+  showCloseButton = true
+}: { 
+  children: React.ReactNode; 
+  className?: string;
+  showCloseButton?: boolean;
+}) {
   const { open, setOpen } = useDialog()
 
   React.useEffect(() => {
@@ -106,13 +114,15 @@ export function DialogContent({ children, className }: { children: React.ReactNo
             )}
             onClick={(e) => e.stopPropagation()}
           >
-            <button
-              onClick={() => setOpen(false)}
-              className="absolute right-4 top-4 rounded-sm p-1 text-gray-400 hover:text-gray-900 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
-            >
-              <X className="h-4 w-4" />
-              <span className="sr-only">Close</span>
-            </button>
+            {showCloseButton && (
+              <button
+                onClick={() => setOpen(false)}
+                className="absolute right-4 top-4 rounded-sm p-1 text-gray-400 hover:text-gray-900 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+              >
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+              </button>
+            )}
             {children}
           </motion.div>
         </div>

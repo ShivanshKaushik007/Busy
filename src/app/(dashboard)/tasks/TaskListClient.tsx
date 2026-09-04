@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { 
@@ -11,11 +11,12 @@ import {
   AlertCircle, 
   CheckCircle2, 
   Plus, 
-  Calendar,
-  X,
-  Filter,
-  ArrowUpDown,
-  UserCheck
+  Calendar, 
+  X, 
+  Filter, 
+  ArrowUpDown, 
+  UserCheck,
+  Keyboard
 } from 'lucide-react'
 import { bulkUpdateStatus, bulkUpdateAssignee, bulkUpdateDueDate, BulkUpdateResult } from '@/app/actions/bulkActions'
 import { TaskStatus } from '@/lib/types'
@@ -26,6 +27,7 @@ import BusyPriorityIcon from '@/components/busy/BusyPriorityIcon'
 import BusyIssueTypeIcon from '@/components/busy/BusyIssueTypeIcon'
 import BusyAvatar from '@/components/busy/BusyAvatar'
 import { formatShortDate, formatFullDate } from '@/lib/dateUtils'
+import { useKeyboardShortcuts } from '@/components/keyboard/KeyboardShortcutsProvider'
 
 export default function TaskListClient({ 
   initialTasks, 
@@ -46,6 +48,74 @@ export default function TaskListClient({
   const [bulkResults, setBulkResults] = useState<BulkUpdateResult[]>([])
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
   const [searchInput, setSearchInput] = useState(searchParams.get('q') || '')
+  const { openShortcutsModal } = useKeyboardShortcuts()
+  const [focusedIndex, setFocusedIndex] = useState<number>(-1)
+
+  // Scroll focused row into view
+  useEffect(() => {
+    if (focusedIndex >= 0 && initialTasks[focusedIndex]) {
+      const row = document.getElementById(`task-row-${initialTasks[focusedIndex].id}`)
+      if (row) {
+        row.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+      }
+    }
+  }, [focusedIndex, initialTasks])
+
+  // Table keyboard listener: j (down), k (up), x (toggle checkbox), Enter/o (open modal), Esc (clear focus)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      const isInput =
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+
+      if (isInput) return
+      if (activeTaskId !== null) return
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+      if (!initialTasks || initialTasks.length === 0) return
+
+      if (e.key.toLowerCase() === 'j' || e.key === 'ArrowDown') {
+        e.preventDefault()
+        setFocusedIndex(prev => (prev < initialTasks.length - 1 ? prev + 1 : 0))
+        return
+      }
+
+      if (e.key.toLowerCase() === 'k' || e.key === 'ArrowUp') {
+        e.preventDefault()
+        setFocusedIndex(prev => (prev > 0 ? prev - 1 : initialTasks.length - 1))
+        return
+      }
+
+      if (e.key.toLowerCase() === 'x') {
+        if (focusedIndex >= 0 && focusedIndex < initialTasks.length) {
+          e.preventDefault()
+          const task = initialTasks[focusedIndex]
+          toggleTask(task.id, !selectedTasks.has(task.id))
+        }
+        return
+      }
+
+      if (e.key === 'Enter' || e.key.toLowerCase() === 'o') {
+        if (focusedIndex >= 0 && focusedIndex < initialTasks.length) {
+          e.preventDefault()
+          setActiveTaskId(initialTasks[focusedIndex].id)
+        }
+        return
+      }
+
+      if (e.key === 'Escape') {
+        if (focusedIndex >= 0) {
+          setFocusedIndex(-1)
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [focusedIndex, initialTasks, selectedTasks, activeTaskId])
 
   // Helper to update URL params triggering server-side refetch
   const updateFilter = (key: string, value: string) => {
@@ -177,6 +247,16 @@ export default function TaskListClient({
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={openShortcutsModal}
+              title="View keyboard shortcuts (?)"
+              className="h-8 px-2.5 text-xs font-medium rounded-[3px] border border-[#DFE1E6] bg-[#FAFBFC] hover:bg-[#EBECF0] text-[#42526E] hover:text-[#172B4D] transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <Keyboard className="w-3.5 h-3.5 text-[#5E6C84]" />
+              <span className="hidden sm:inline">Shortcuts</span>
+              <kbd className="text-[10px] font-mono bg-white border border-[#DFE1E6] px-1 rounded text-[#5E6C84]">?</kbd>
+            </button>
             <button
               onClick={exportCSV}
               className="h-8 px-2.5 text-xs font-medium rounded-[3px] border border-[#DFE1E6] bg-[#FAFBFC] hover:bg-[#EBECF0] text-[#42526E] hover:text-[#172B4D] transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
@@ -438,6 +518,41 @@ export default function TaskListClient({
         </div>
       )}
 
+      {/* Keyboard Quick Navigation Banner */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 bg-[#FAFBFC] border border-[#DFE1E6] rounded-[3px] text-[11px] text-[#5E6C84]">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-semibold text-[#172B4D] flex items-center gap-1">
+            <Keyboard className="w-3.5 h-3.5 text-[#0052CC]" />
+            <span>Table Keys:</span>
+          </span>
+          <span className="flex items-center gap-1">
+            <kbd className="bg-white border border-[#DFE1E6] px-1 rounded text-[10px] font-mono font-semibold">j</kbd>
+            <kbd className="bg-white border border-[#DFE1E6] px-1 rounded text-[10px] font-mono font-semibold">k</kbd>
+            <span>rows</span>
+          </span>
+          <span>•</span>
+          <span className="flex items-center gap-1">
+            <kbd className="bg-white border border-[#DFE1E6] px-1 rounded text-[10px] font-mono font-semibold">x</kbd>
+            <span>toggle select</span>
+          </span>
+          <span>•</span>
+          <span className="flex items-center gap-1">
+            <kbd className="bg-white border border-[#DFE1E6] px-1.5 rounded text-[10px] font-mono font-semibold">↵</kbd>
+            <span>open details</span>
+          </span>
+        </div>
+        {focusedIndex >= 0 ? (
+          <div className="flex items-center gap-1.5 text-[#0052CC] font-medium animate-in fade-in duration-150">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#0052CC] animate-pulse" />
+            <span>Row {focusedIndex + 1} focused • Press Esc to clear</span>
+          </div>
+        ) : (
+          <span className="text-[#8993A4] hidden md:inline">
+            Press <kbd className="bg-white border border-[#DFE1E6] px-1 rounded text-[10px] font-mono">j</kbd> to begin navigating rows
+          </span>
+        )}
+      </div>
+
       {/* 4. Jira Data Table */}
       <div className="bg-white border border-[#DFE1E6] rounded-[3px] shadow-2xs overflow-x-auto">
         <table className="w-full text-left text-xs text-[#172B4D]">
@@ -479,19 +594,28 @@ export default function TaskListClient({
                 </td>
               </tr>
             ) : (
-              initialTasks.map((task: any) => {
+              initialTasks.map((task: any, index: number) => {
                 const isSelected = selectedTasks.has(task.id)
+                const isFocused = focusedIndex === index
                 const issueKey = `${task.projects?.key || 'TASK'}-${task.id.slice(0, 4).toUpperCase()}`
                 const isTaskOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'Done'
                 const assignments = task.task_assignments || []
 
                 return (
                   <tr 
+                    id={`task-row-${task.id}`}
                     key={task.id} 
-                    className={`hover:bg-[#F4F5F7] transition-colors cursor-pointer group ${
-                      isSelected ? 'bg-[#DEEBFF]/30' : ''
+                    className={`transition-colors cursor-pointer group ${
+                      isFocused
+                        ? 'bg-[#DEEBFF]/60 border-l-4 border-l-[#0052CC]'
+                        : isSelected
+                        ? 'bg-[#DEEBFF]/30 hover:bg-[#DEEBFF]/40'
+                        : 'hover:bg-[#F4F5F7]'
                     }`}
-                    onClick={() => setActiveTaskId(task.id)}
+                    onClick={() => {
+                      setFocusedIndex(index)
+                      setActiveTaskId(task.id)
+                    }}
                   >
                     {/* Checkbox */}
                     <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>

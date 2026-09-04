@@ -14,7 +14,8 @@ import {
   Clock,
   Filter,
   X,
-  GripVertical
+  GripVertical,
+  Keyboard
 } from 'lucide-react'
 import TaskDetailModal from '@/components/TaskDetailModal'
 import CreateTaskDialog from '@/components/CreateTaskDialog'
@@ -23,6 +24,7 @@ import BusyPriorityIcon from '@/components/busy/BusyPriorityIcon'
 import BusyIssueTypeIcon from '@/components/busy/BusyIssueTypeIcon'
 import BusyAvatar from '@/components/busy/BusyAvatar'
 import { updateTaskStatus } from '@/app/actions/taskActions'
+import { useKeyboardShortcuts } from '@/components/keyboard/KeyboardShortcutsProvider'
 import { TaskStatus } from '@/lib/types'
 import { formatShortDate } from '@/lib/dateUtils'
 
@@ -192,11 +194,11 @@ export default function BoardClient({
     return Array.from(map.values())
   }, [tasks])
 
-  const handleQuickMove = async (e: React.MouseEvent, taskId: string, newStatus: TaskStatus) => {
-    e.stopPropagation()
-    setError(null)
+  const { openShortcutsModal } = useKeyboardShortcuts()
+  const [focusedTaskId, setFocusedTaskId] = useState<string | null>(null)
 
-    // Optimistic update
+  const moveTaskStatus = async (taskId: string, newStatus: TaskStatus) => {
+    setError(null)
     const prevTasks = [...tasks]
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus, updated_at: new Date().toISOString() } : t))
 
@@ -208,6 +210,11 @@ export default function BoardClient({
     } else {
       router.refresh()
     }
+  }
+
+  const handleQuickMove = async (e: React.MouseEvent, taskId: string, newStatus: TaskStatus) => {
+    e.stopPropagation()
+    await moveTaskStatus(taskId, newStatus)
   }
 
   // Filter tasks based on Jira quick filters
@@ -243,6 +250,194 @@ export default function BoardClient({
     })
   }, [tasks, searchQuery, selectedProject, selectedAssignee, onlyMyIssues, recentOnly, currentUserId])
 
+  // Scroll active card into view when keyboard focused
+  useEffect(() => {
+    if (focusedTaskId) {
+      const el = document.getElementById(`task-card-${focusedTaskId}`)
+      if (el) {
+        el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+      }
+    }
+  }, [focusedTaskId])
+
+  // Board keyboard shortcuts listener (j, k, h, l, Enter, o, [, ], Esc)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      const isInput =
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+
+      if (isInput) return
+      if (activeTaskId !== null) return // A task detail modal is open
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+
+      // Flat list of visible cards in board column order
+      const allVisibleTasks = COLUMNS.flatMap(col => 
+        filteredTasks.filter(t => t.status === col.id)
+      )
+      if (allVisibleTasks.length === 0) return
+
+      const colMap = COLUMNS.map(col => ({
+        colId: col.id,
+        tasks: filteredTasks.filter(t => t.status === col.id)
+      }))
+
+      // J / ArrowDown: Move down to next card
+      if (e.key.toLowerCase() === 'j' || e.key === 'ArrowDown') {
+        e.preventDefault()
+        if (!focusedTaskId) {
+          setFocusedTaskId(allVisibleTasks[0].id)
+          return
+        }
+        const currentIndex = allVisibleTasks.findIndex(t => t.id === focusedTaskId)
+        if (currentIndex === -1 || currentIndex === allVisibleTasks.length - 1) {
+          setFocusedTaskId(allVisibleTasks[0].id)
+        } else {
+          setFocusedTaskId(allVisibleTasks[currentIndex + 1].id)
+        }
+        return
+      }
+
+      // K / ArrowUp: Move up to previous card
+      if (e.key.toLowerCase() === 'k' || e.key === 'ArrowUp') {
+        e.preventDefault()
+        if (!focusedTaskId) {
+          setFocusedTaskId(allVisibleTasks[allVisibleTasks.length - 1].id)
+          return
+        }
+        const currentIndex = allVisibleTasks.findIndex(t => t.id === focusedTaskId)
+        if (currentIndex <= 0) {
+          setFocusedTaskId(allVisibleTasks[allVisibleTasks.length - 1].id)
+        } else {
+          setFocusedTaskId(allVisibleTasks[currentIndex - 1].id)
+        }
+        return
+      }
+
+      // L / ArrowRight: Move to column on the right
+      if (e.key.toLowerCase() === 'l' || e.key === 'ArrowRight') {
+        e.preventDefault()
+        if (!focusedTaskId) {
+          setFocusedTaskId(allVisibleTasks[0].id)
+          return
+        }
+        const currentColIdx = colMap.findIndex(c => c.tasks.some(t => t.id === focusedTaskId))
+        if (currentColIdx !== -1 && currentColIdx < colMap.length - 1) {
+          for (let i = currentColIdx + 1; i < colMap.length; i++) {
+            if (colMap[i].tasks.length > 0) {
+              const currentTaskIdxInCol = colMap[currentColIdx].tasks.findIndex(t => t.id === focusedTaskId)
+              const targetIdx = Math.min(currentTaskIdxInCol, colMap[i].tasks.length - 1)
+              setFocusedTaskId(colMap[i].tasks[targetIdx].id)
+              return
+            }
+          }
+        }
+        return
+      }
+
+      // H / ArrowLeft: Move to column on the left
+      if (e.key.toLowerCase() === 'h' || e.key === 'ArrowLeft') {
+        e.preventDefault()
+        if (!focusedTaskId) {
+          setFocusedTaskId(allVisibleTasks[0].id)
+          return
+        }
+        const currentColIdx = colMap.findIndex(c => c.tasks.some(t => t.id === focusedTaskId))
+        if (currentColIdx > 0) {
+          for (let i = currentColIdx - 1; i >= 0; i--) {
+            if (colMap[i].tasks.length > 0) {
+              const currentTaskIdxInCol = colMap[currentColIdx].tasks.findIndex(t => t.id === focusedTaskId)
+              const targetIdx = Math.min(currentTaskIdxInCol, colMap[i].tasks.length - 1)
+              setFocusedTaskId(colMap[i].tasks[targetIdx].id)
+              return
+            }
+          }
+        }
+        return
+      }
+
+      // Enter or 'o': Open task detail modal
+      if (e.key === 'Enter' || e.key.toLowerCase() === 'o') {
+        if (focusedTaskId) {
+          e.preventDefault()
+          setActiveTaskId(focusedTaskId)
+        }
+        return
+      }
+
+      // ']' Advance card status forward
+      if (e.key === ']') {
+        if (focusedTaskId) {
+          e.preventDefault()
+          const task = tasks.find(t => t.id === focusedTaskId)
+          if (task) {
+            if (task.is_blocked) {
+              setError(`Cannot advance "${task.title}": Task is currently marked as Blocked.`)
+              setTimeout(() => setError(null), 5000)
+              return
+            }
+            const allowed = NEXT_MOVES[task.status as TaskStatus] || []
+            let nextTarget: TaskStatus | null = null
+            if (task.status === 'Backlog' && allowed.includes('In Progress')) nextTarget = 'In Progress'
+            else if (task.status === 'In Progress' && allowed.includes('In Review')) nextTarget = 'In Review'
+            else if (task.status === 'In Review' && allowed.includes('Done')) nextTarget = 'Done'
+
+            if (nextTarget) {
+              moveTaskStatus(task.id, nextTarget)
+            } else {
+              setError(`Cannot advance task beyond "${task.status}". Permitted moves: ${allowed.join(', ') || 'None'}.`)
+              setTimeout(() => setError(null), 5000)
+            }
+          }
+        }
+        return
+      }
+
+      // '[' Regress card status backward
+      if (e.key === '[') {
+        if (focusedTaskId) {
+          e.preventDefault()
+          const task = tasks.find(t => t.id === focusedTaskId)
+          if (task) {
+            if (task.is_blocked) {
+              setError(`Cannot move "${task.title}": Task is currently marked as Blocked.`)
+              setTimeout(() => setError(null), 5000)
+              return
+            }
+            const allowed = NEXT_MOVES[task.status as TaskStatus] || []
+            let prevTarget: TaskStatus | null = null
+            if (task.status === 'Done' && allowed.includes('In Progress')) prevTarget = 'In Progress'
+            else if (task.status === 'Done' && allowed.includes('Backlog')) prevTarget = 'Backlog'
+            else if (task.status === 'In Review' && allowed.includes('In Progress')) prevTarget = 'In Progress'
+            else if (task.status === 'In Progress' && allowed.includes('Backlog')) prevTarget = 'Backlog'
+
+            if (prevTarget) {
+              moveTaskStatus(task.id, prevTarget)
+            } else {
+              setError(`Cannot regress task before "${task.status}". Permitted moves: ${allowed.join(', ') || 'None'}.`)
+              setTimeout(() => setError(null), 5000)
+            }
+          }
+        }
+        return
+      }
+
+      // Escape: Deselect focused card
+      if (e.key === 'Escape') {
+        if (focusedTaskId) {
+          setFocusedTaskId(null)
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [focusedTaskId, filteredTasks, activeTaskId, tasks])
+
   const activeProjectData = projects.find(p => p.id === selectedProject)
   const isAnyFilterActive = searchQuery || selectedProject || selectedAssignee || onlyMyIssues || recentOnly
 
@@ -277,6 +472,17 @@ export default function BoardClient({
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={openShortcutsModal}
+              title="View board keyboard shortcuts (?)"
+              className="bg-white hover:bg-[#EBECF0] text-[#42526E] border border-[#DFE1E6] font-medium text-xs px-2.5 py-1.5 rounded-[3px] shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <Keyboard className="w-3.5 h-3.5 text-[#5E6C84]" />
+              <span className="hidden sm:inline">Keys</span>
+              <kbd className="text-[10px] font-mono bg-[#FAFBFC] border border-[#DFE1E6] px-1 rounded text-[#5E6C84]">?</kbd>
+            </button>
+
             <CreateTaskDialog 
               defaultProjectId={selectedProject || undefined}
               trigger={
@@ -380,6 +586,48 @@ export default function BoardClient({
         )}
       </div>
 
+      {/* Keyboard Quick Navigation Banner */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 bg-[#FAFBFC] border border-[#DFE1E6] rounded-[3px] text-[11px] text-[#5E6C84]">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-semibold text-[#172B4D] flex items-center gap-1">
+            <Keyboard className="w-3.5 h-3.5 text-[#0052CC]" />
+            <span>Board Keys:</span>
+          </span>
+          <span className="flex items-center gap-1">
+            <kbd className="bg-white border border-[#DFE1E6] px-1 rounded text-[10px] font-mono font-semibold">j</kbd>
+            <kbd className="bg-white border border-[#DFE1E6] px-1 rounded text-[10px] font-mono font-semibold">k</kbd>
+            <span>cards</span>
+          </span>
+          <span>•</span>
+          <span className="flex items-center gap-1">
+            <kbd className="bg-white border border-[#DFE1E6] px-1 rounded text-[10px] font-mono font-semibold">h</kbd>
+            <kbd className="bg-white border border-[#DFE1E6] px-1 rounded text-[10px] font-mono font-semibold">l</kbd>
+            <span>columns</span>
+          </span>
+          <span>•</span>
+          <span className="flex items-center gap-1">
+            <kbd className="bg-white border border-[#DFE1E6] px-1.5 rounded text-[10px] font-mono font-semibold">↵</kbd>
+            <span>open</span>
+          </span>
+          <span>•</span>
+          <span className="flex items-center gap-1">
+            <kbd className="bg-white border border-[#DFE1E6] px-1 rounded text-[10px] font-mono font-semibold">[</kbd>
+            <kbd className="bg-white border border-[#DFE1E6] px-1 rounded text-[10px] font-mono font-semibold">]</kbd>
+            <span>move status</span>
+          </span>
+        </div>
+        {focusedTaskId ? (
+          <div className="flex items-center gap-1.5 text-[#0052CC] font-medium animate-in fade-in duration-150">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#0052CC] animate-pulse" />
+            <span>Card selected • Press Esc to deselect</span>
+          </div>
+        ) : (
+          <span className="text-[#8993A4] hidden md:inline">
+            Press <kbd className="bg-white border border-[#DFE1E6] px-1 rounded text-[10px] font-mono">j</kbd> to begin navigating
+          </span>
+        )}
+      </div>
+
       {/* Error Alert Banner */}
       {error && (
         <div className="p-3 text-xs text-[#DE350B] bg-[#FFEBE6] border border-[#FFBDAD] rounded-[3px] flex items-center gap-2 animate-in fade-in">
@@ -459,17 +707,24 @@ export default function BoardClient({
                     const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'Done'
                     const assignments = task.task_assignments || []
                     const isBeingDragged = draggedTaskId === task.id
+                    const isFocused = focusedTaskId === task.id
 
                     return (
                       <div 
+                        id={`task-card-${task.id}`}
                         key={task.id}
                         draggable={true}
                         onDragStart={(e) => handleDragStart(e, task)}
                         onDragEnd={handleDragEnd}
-                        onClick={() => handleCardClick(task.id)}
-                        className={`bg-white rounded-[3px] border p-3 transition-all cursor-grab active:cursor-grabbing select-none group space-y-2 ${
+                        onClick={() => {
+                          setFocusedTaskId(task.id)
+                          handleCardClick(task.id)
+                        }}
+                        className={`bg-white rounded-[3px] border p-3 transition-all cursor-grab active:cursor-grabbing select-none group space-y-2 relative ${
                           isBeingDragged
                             ? 'opacity-30 border-dashed border-[#0052CC] scale-[0.98] shadow-inner bg-[#F4F5F7]'
+                            : isFocused
+                            ? 'border-[#0052CC] ring-2 ring-[#0052CC] ring-offset-2 shadow-md bg-blue-50/20'
                             : 'border-[#DFE1E6] shadow-2xs hover:shadow-xs hover:border-[#4C9AFF]'
                         }`}
                       >

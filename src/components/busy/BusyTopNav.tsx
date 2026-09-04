@@ -11,7 +11,9 @@ import {
   UserCheck,
   FolderKanban,
   Users,
-  LogOut
+  LogOut,
+  Keyboard,
+  Sparkles
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -22,6 +24,7 @@ import { logout } from '@/app/login/actions'
 import OverdueAlerts, { OverdueAlert } from '@/components/OverdueAlerts'
 import CreateTaskDialog from '@/components/CreateTaskDialog'
 import BusyAvatar from './BusyAvatar'
+import { useKeyboardShortcuts } from '@/components/keyboard/KeyboardShortcutsProvider'
 
 interface BusyTopNavProps {
   alerts: OverdueAlert[]
@@ -39,6 +42,7 @@ export default function BusyTopNav({
   const router = useRouter()
   const pathname = usePathname()
   const [searchQuery, setSearchQuery] = useState('')
+  const { openCommandPalette, openShortcutsModal } = useKeyboardShortcuts()
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -126,13 +130,17 @@ export default function BusyTopNav({
         <form onSubmit={handleSearchSubmit} className="relative hidden sm:block">
           <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-[#5E6C84]" />
           <input
+            id="global-search-input"
             type="search"
             placeholder="Search Busy"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-48 lg:w-64 h-8 pl-8 pr-7 bg-[#FAFBFC] hover:bg-[#EBECF0] focus:bg-white border border-[#DFE1E6] focus:border-[#0052CC] focus:ring-1 focus:ring-[#0052CC] rounded-[3px] text-xs text-[#172B4D] placeholder:text-[#5E6C84] transition-all outline-none"
           />
-          <kbd className="absolute right-2 top-2 text-[10px] font-mono text-[#5E6C84] bg-white px-1 border border-[#DFE1E6] rounded-[2px] leading-tight">
+          <kbd 
+            title="Quick search (/)"
+            className="absolute right-2 top-2 text-[10px] font-mono text-[#5E6C84] bg-white px-1 border border-[#DFE1E6] rounded-[2px] leading-tight select-none pointer-events-none"
+          >
             /
           </kbd>
         </form>
@@ -208,6 +216,33 @@ export default function BusyTopNav({
                 <Users className="w-4 h-4 text-[#5E6C84]" />
                 <span className="font-medium">Teams & People</span>
               </Link>
+
+              <button
+                type="button"
+                onClick={openCommandPalette}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-[3px] hover:bg-[#EBECF0] hover:text-[#0052CC] transition-colors text-left cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Sparkles className="w-4 h-4 text-[#5E6C84]" />
+                  <span className="font-medium">Command Palette</span>
+                </div>
+                <div className="flex items-center gap-1 text-[10px] font-mono text-[#5E6C84]">
+                  <kbd className="px-1.5 py-0.5 bg-white border border-[#DFE1E6] rounded text-[10px]">Ctrl</kbd>
+                  <kbd className="px-1.5 py-0.5 bg-white border border-[#DFE1E6] rounded text-[10px]">K</kbd>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={openShortcutsModal}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-[3px] hover:bg-[#EBECF0] hover:text-[#0052CC] transition-colors text-left cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Keyboard className="w-4 h-4 text-[#5E6C84]" />
+                  <span className="font-medium">Keyboard Shortcuts</span>
+                </div>
+                <kbd className="px-1.5 py-0.5 text-[10px] font-mono bg-white border border-[#DFE1E6] rounded text-[#5E6C84]">?</kbd>
+              </button>
             </div>
 
             {/* Sign Out Action */}
