@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <linearGradient id="busy-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0065FF"/>
+      <stop offset="100%" stop-color="#0747A6"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="7" fill="url(#busy-grad)"/>
+  <g transform="translate(6, 4) scale(0.95)">
+    <path d="M11.53 2c0 2.4-1.97 4.35-4.4 4.35H2.8v4.35h4.33c4.8 0 8.7-3.9 8.7-8.7V2h-4.3z" fill="#FFFFFF"/>
+    <path d="M11.53 9.87c0 2.4-1.97 4.35-4.4 4.35H2.8v4.35h4.33c4.8 0 8.7-3.9 8.7-8.7v-.01h-4.3z" fill="#FFFFFF" fill-opacity="0.8"/>
+    <path d="M11.53 17.74c0 2.4-1.97 4.35-4.4 4.35H2.8v.01h8.73c2.4 0 4.35-1.95 4.35-4.36h-4.35z" fill="#FFFFFF" fill-opacity="0.55"/>
+  </g>
+</svg>
