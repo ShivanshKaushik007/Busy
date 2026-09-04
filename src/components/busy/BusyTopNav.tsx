@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { 
   Search, 
   Plus 
@@ -26,6 +26,7 @@ export default function BusyTopNav({
   userRole
 }: BusyTopNavProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const [searchQuery, setSearchQuery] = useState('')
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -60,35 +61,45 @@ export default function BusyTopNav({
         <nav className="hidden md:flex items-center space-x-1 h-full text-[13px] font-medium text-[#42526E]">
           <Link
             href="/"
-            className="px-2.5 py-1.5 rounded-[3px] hover:bg-[#EBECF0] hover:text-[#172B4D] transition-colors"
+            className={`px-2.5 py-1.5 rounded-[3px] transition-colors ${
+              pathname === '/' ? 'text-[#0052CC] font-semibold bg-[#EBECF0]' : 'hover:bg-[#EBECF0] hover:text-[#172B4D]'
+            }`}
           >
             Your work
           </Link>
 
           <Link
             href="/projects"
-            className="px-2.5 py-1.5 rounded-[3px] hover:bg-[#EBECF0] hover:text-[#172B4D] transition-colors"
+            className={`px-2.5 py-1.5 rounded-[3px] transition-colors ${
+              pathname.startsWith('/projects') ? 'text-[#0052CC] font-semibold bg-[#EBECF0]' : 'hover:bg-[#EBECF0] hover:text-[#172B4D]'
+            }`}
           >
             Projects
           </Link>
 
           <Link
             href="/tasks"
-            className="px-2.5 py-1.5 rounded-[3px] hover:bg-[#EBECF0] hover:text-[#172B4D] transition-colors"
+            className={`px-2.5 py-1.5 rounded-[3px] transition-colors ${
+              pathname.startsWith('/tasks') ? 'text-[#0052CC] font-semibold bg-[#EBECF0]' : 'hover:bg-[#EBECF0] hover:text-[#172B4D]'
+            }`}
           >
             Filters
           </Link>
 
           <Link
-            href="/"
-            className="px-2.5 py-1.5 rounded-[3px] hover:bg-[#EBECF0] hover:text-[#172B4D] transition-colors"
+            href="/board"
+            className={`px-2.5 py-1.5 rounded-[3px] transition-colors ${
+              pathname.startsWith('/board') ? 'text-[#0052CC] font-semibold bg-[#EBECF0]' : 'hover:bg-[#EBECF0] hover:text-[#172B4D]'
+            }`}
           >
             Dashboards
           </Link>
 
           <Link
-            href="/projects"
-            className="px-2.5 py-1.5 rounded-[3px] hover:bg-[#EBECF0] hover:text-[#172B4D] transition-colors"
+            href="/teams"
+            className={`px-2.5 py-1.5 rounded-[3px] transition-colors ${
+              pathname.startsWith('/teams') ? 'text-[#0052CC] font-semibold bg-[#EBECF0]' : 'hover:bg-[#EBECF0] hover:text-[#172B4D]'
+            }`}
           >
             Teams
           </Link>

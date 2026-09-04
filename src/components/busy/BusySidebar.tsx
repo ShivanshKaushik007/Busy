@@ -9,6 +9,7 @@ import {
   UserCheck, 
   LayoutDashboard, 
   Users, 
+  FolderKanban,
   ChevronLeft, 
   ChevronRight,
   Info
@@ -152,15 +153,28 @@ export default function BusySidebar({
           )}
           <div className="space-y-0.5">
             <Link
+              href="/teams"
+              className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-[3px] text-[13px] font-medium transition-colors ${
+                isLinkActive('/teams')
+                  ? 'bg-[#DEEBFF] text-[#0052CC] font-semibold border-l-3 border-[#0052CC] pl-2'
+                  : 'text-[#42526E] hover:bg-[#EBECF0] hover:text-[#172B4D]'
+              }`}
+              title="Project Teams"
+            >
+              <Users className="w-4 h-4 shrink-0 text-inherit" />
+              {!collapsed && <span>Teams</span>}
+            </Link>
+
+            <Link
               href="/projects"
               className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-[3px] text-[13px] font-medium transition-colors ${
                 isLinkActive('/projects')
                   ? 'bg-[#DEEBFF] text-[#0052CC] font-semibold border-l-3 border-[#0052CC] pl-2'
                   : 'text-[#42526E] hover:bg-[#EBECF0] hover:text-[#172B4D]'
               }`}
-              title="Projects & Teams"
+              title="Projects & Access"
             >
-              <Users className="w-4 h-4 shrink-0 text-inherit" />
+              <FolderKanban className="w-4 h-4 shrink-0 text-inherit" />
               {!collapsed && <span>Projects & Access</span>}
             </Link>
           </div>
