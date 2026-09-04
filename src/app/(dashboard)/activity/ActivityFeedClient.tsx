@@ -325,6 +325,18 @@ export default function ActivityFeedClient({
             <PlusCircle className="w-3 h-3" />
             <span>New Issues</span>
           </button>
+
+          <button
+            onClick={() => handleCategoryChange('worklog')}
+            className={`px-2.5 py-1 rounded-[3px] font-medium transition-colors cursor-pointer shrink-0 flex items-center gap-1.5 ${
+              selectedCategory === 'worklog'
+                ? 'bg-[#0052CC] text-white font-semibold shadow-2xs'
+                : 'text-[#42526E] hover:bg-[#EBECF0] hover:text-[#172B4D]'
+            }`}
+          >
+            <Clock className="w-3 h-3" />
+            <span>Work Logs</span>
+          </button>
         </div>
 
         {/* Dropdowns & Search Bar */}
@@ -442,6 +454,8 @@ export default function ActivityFeedClient({
                   const isBlocked = item.action_type === 'blocked_change' || item.action_type === 'added_blocker' || item.action_type === 'removed_blocker'
                   const isCreated = item.action_type === 'created'
                   const isAssignment = item.action_type === 'assignment' || item.action_type === 'unassignment'
+                  const isWorklog = item.action_type === 'worklog'
+                  const isEstimate = item.action_type === 'estimate_updated'
 
                   return (
                     <div
@@ -479,7 +493,13 @@ export default function ActivityFeedClient({
                           {isAssignment && (
                             <span className="text-[#5E6C84]">updated assignment for</span>
                           )}
-                          {!isComment && !isStatus && !isCreated && !isBlocked && !isAssignment && (
+                          {isWorklog && (
+                            <span className="text-[#5E6C84]">logged work on</span>
+                          )}
+                          {isEstimate && (
+                            <span className="text-[#5E6C84]">updated estimate for</span>
+                          )}
+                          {!isComment && !isStatus && !isCreated && !isBlocked && !isAssignment && !isWorklog && !isEstimate && (
                             <span className="text-[#5E6C84]">updated details on</span>
                           )}
 
@@ -561,6 +581,55 @@ export default function ActivityFeedClient({
                             <UserCheck className="w-3.5 h-3.5 text-[#00875A]" />
                             <span>{item.action_type === 'assignment' ? 'Assigned teammate to issue' : 'Removed assignee from issue'}</span>
                           </div>
+                        ) : isWorklog ? (
+                          (() => {
+                            let payload: any = {}
+                            try {
+                              payload = typeof item.new_value === 'string' && item.new_value.startsWith('{')
+                                ? JSON.parse(item.new_value)
+                                : { timeSpentFormatted: item.new_value }
+                            } catch (e) {
+                              payload = { timeSpentFormatted: item.new_value }
+                            }
+                            return (
+                              <div className="space-y-1 p-2 bg-[#FAFBFC] border border-[#DFE1E6] rounded-[3px] text-xs">
+                                <div className="flex items-center gap-2">
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#DEEBFF] text-[#0052CC] font-mono font-bold text-xs">
+                                    <Clock className="w-3 h-3" />
+                                    <span>Logged {payload.timeSpentFormatted}</span>
+                                  </span>
+                                  {payload.remainingFormatted && (
+                                    <span className="text-[11px] text-[#5E6C84]">
+                                      Remaining: <strong className="text-[#172B4D]">{payload.remainingFormatted}</strong>
+                                    </span>
+                                  )}
+                                </div>
+                                {payload.description && (
+                                  <p className="text-xs text-[#172B4D] whitespace-pre-wrap">{payload.description}</p>
+                                )}
+                              </div>
+                            )
+                          })()
+                        ) : isEstimate ? (
+                          (() => {
+                            let payload: any = {}
+                            try {
+                              payload = typeof item.new_value === 'string' && item.new_value.startsWith('{')
+                                ? JSON.parse(item.new_value)
+                                : { estimateFormatted: item.new_value }
+                            } catch (e) {
+                              payload = { estimateFormatted: item.new_value }
+                            }
+                            return (
+                              <div className="text-xs text-[#5E6C84] flex items-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5 text-[#0052CC]" />
+                                <span>Original estimate set to</span>
+                                <span className="font-semibold text-[#172B4D] font-mono bg-[#EBECF0] px-1.5 py-0.5 rounded">
+                                  {payload.estimateFormatted || 'None'}
+                                </span>
+                              </div>
+                            )
+                          })()
                         ) : (
                           <div className="text-xs text-[#5E6C84] py-0.5">
                             <span className="text-[11px] font-mono text-[#172B4D] bg-[#EBECF0] px-1 py-0.5 rounded">{item.action_type}</span>

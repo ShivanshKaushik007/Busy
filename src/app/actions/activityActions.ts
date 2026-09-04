@@ -12,6 +12,7 @@ export type ActivityActionCategory =
   | 'blocked' 
   | 'created' 
   | 'details'
+  | 'worklog'
 
 export interface ActivityFilterOptions {
   projectId?: string
@@ -126,6 +127,8 @@ export async function getActivityFeed(options: ActivityFilterOptions = {}) {
       query = query.in('action_type', ['blocked_change', 'added_blocker', 'removed_blocker'])
     } else if (options.actionCategory === 'created') {
       query = query.eq('action_type', 'created')
+    } else if (options.actionCategory === 'worklog') {
+      query = query.in('action_type', ['worklog', 'estimate_updated'])
     } else if (options.actionCategory === 'details') {
       query = query.like('action_type', 'updated_%')
     }

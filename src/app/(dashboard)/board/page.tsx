@@ -25,6 +25,12 @@ export default async function BoardPage({
       task_assignments ( 
         user_id,
         profiles ( id, full_name, email )
+      ),
+      task_history (
+        id,
+        action_type,
+        new_value,
+        created_at
       )
     `)
     .in('project_id', projectIds.length > 0 ? projectIds : ['00000000-0000-0000-0000-000000000000'])

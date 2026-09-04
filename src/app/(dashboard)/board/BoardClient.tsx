@@ -23,6 +23,8 @@ import BusyLozenge from '@/components/busy/BusyLozenge'
 import BusyPriorityIcon from '@/components/busy/BusyPriorityIcon'
 import BusyIssueTypeIcon from '@/components/busy/BusyIssueTypeIcon'
 import BusyAvatar from '@/components/busy/BusyAvatar'
+import TimeTrackingProgress from '@/components/busy/TimeTrackingProgress'
+import { getTimeTrackingSummary } from '@/lib/timeTrackingUtils'
 import { updateTaskStatus } from '@/app/actions/taskActions'
 import { useKeyboardShortcuts } from '@/components/keyboard/KeyboardShortcutsProvider'
 import { TaskStatus } from '@/lib/types'
@@ -708,6 +710,7 @@ export default function BoardClient({
                     const assignments = task.task_assignments || []
                     const isBeingDragged = draggedTaskId === task.id
                     const isFocused = focusedTaskId === task.id
+                    const timeSummary = getTimeTrackingSummary(task.task_history || [])
 
                     return (
                       <div 
@@ -740,6 +743,13 @@ export default function BoardClient({
                         {task.is_blocked && (
                           <div>
                             <BusyLozenge status="Blocked" isBlocked={true} size="sm" />
+                          </div>
+                        )}
+
+                        {/* Time tracking badge if has tracking data */}
+                        {timeSummary.hasTrackingData && (
+                          <div>
+                            <TimeTrackingProgress summary={timeSummary} compact={true} />
                           </div>
                         )}
 

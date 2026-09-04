@@ -15,7 +15,8 @@ import {
   Calendar,
   Layers,
   ChevronDown,
-  AtSign
+  AtSign,
+  Timer
 } from 'lucide-react'
 import {
   Dialog,
@@ -32,6 +33,7 @@ import {
   removeTaskDependency, 
   toggleTaskAssignment 
 } from '@/app/actions/taskActions'
+import { deleteTaskWorklog } from '@/app/actions/timeTrackingActions'
 import { TaskPriority, TaskStatus } from '@/lib/types'
 import BusyLozenge from '@/components/busy/BusyLozenge'
 import BusyPriorityIcon from '@/components/busy/BusyPriorityIcon'
@@ -39,6 +41,10 @@ import BusyIssueTypeIcon from '@/components/busy/BusyIssueTypeIcon'
 import BusyAvatar from '@/components/busy/BusyAvatar'
 import MentionTextarea from '@/components/busy/MentionTextarea'
 import CommentRenderer, { containsAnyMention, containsUserMention } from '@/components/busy/CommentRenderer'
+import TimeTrackingProgress from '@/components/busy/TimeTrackingProgress'
+import LogWorkModal from '@/components/busy/LogWorkModal'
+import SetEstimateModal from '@/components/busy/SetEstimateModal'
+import { getTimeTrackingSummary } from '@/lib/timeTrackingUtils'
 import { formatDateTime } from '@/lib/dateUtils'
 
 interface TaskDetailModalProps {
@@ -68,8 +74,26 @@ export default function TaskDetailModal({ taskId, onClose, onTaskUpdated }: Task
   const [commentText, setCommentText] = useState('')
   const [submittingComment, setSubmittingComment] = useState(false)
   const [savingDetails, setSavingDetails] = useState(false)
-  const [activityTab, setActivityTab] = useState<'all' | 'comments' | 'mentions' | 'history'>('all')
+  const [activityTab, setActivityTab] = useState<'all' | 'comments' | 'mentions' | 'worklog' | 'history'>('all')
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false)
+  const [logWorkOpen, setLogWorkOpen] = useState(false)
+  const [estimateModalOpen, setEstimateModalOpen] = useState(false)
+
+  const timeSummary = React.useMemo(() => {
+    return getTimeTrackingSummary(data?.history || [])
+  }, [data?.history])
+
+  const handleDeleteWorklog = async (historyId: string) => {
+    if (!taskId) return
+    if (!confirm('Are you sure you want to remove this work log entry?')) return
+    const res = await deleteTaskWorklog(taskId, historyId)
+    if (res.error) {
+      setError(res.error)
+    } else {
+      showSuccess('Work log entry removed')
+      loadData()
+    }
+  }
 
   const loadData = async () => {
     if (!taskId) return
@@ -205,7 +229,8 @@ export default function TaskDetailModal({ taskId, onClose, onTaskUpdated }: Task
   const historyItems = (data?.history || []).filter((h: any) => {
     if (activityTab === 'comments') return h.action_type === 'comment'
     if (activityTab === 'mentions') return h.action_type === 'comment' && containsAnyMention(h.new_value || '')
-    if (activityTab === 'history') return h.action_type !== 'comment'
+    if (activityTab === 'worklog') return h.action_type === 'worklog'
+    if (activityTab === 'history') return h.action_type !== 'comment' && h.action_type !== 'worklog'
     return true
   })
 
@@ -381,6 +406,17 @@ export default function TaskDetailModal({ taskId, onClose, onTaskUpdated }: Task
                       <span>Mentions</span>
                     </button>
                     <button
+                      onClick={() => setActivityTab('worklog')}
+                      className={`px-2 py-0.5 rounded-[3px] font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                        activityTab === 'worklog' 
+                          ? 'bg-[#EBECF0] text-[#172B4D] font-semibold' 
+                          : 'text-[#5E6C84] hover:bg-[#FAFBFC]'
+                      }`}
+                    >
+                      <Clock className="w-3 h-3 text-[#0052CC]" />
+                      <span>Work Log {timeSummary.worklogs.length > 0 ? `(${timeSummary.worklogs.length})` : ''}</span>
+                    </button>
+                    <button
                       onClick={() => setActivityTab('history')}
                       className={`px-2 py-0.5 rounded-[3px] font-medium transition-colors cursor-pointer ${
                         activityTab === 'history' 
@@ -499,6 +535,71 @@ export default function TaskDetailModal({ taskId, onClose, onTaskUpdated }: Task
                               <p className="text-[#5E6C84]">assigned a team member to this issue</p>
                             ) : h.action_type === 'unassignment' ? (
                               <p className="text-[#5E6C84]">unassigned a team member from this issue</p>
+                            ) : h.action_type === 'worklog' ? (
+                              (() => {
+                                let payload: any = {}
+                                try {
+                                  payload = typeof h.new_value === 'string' && h.new_value.startsWith('{')
+                                    ? JSON.parse(h.new_value)
+                                    : { timeSpentFormatted: h.new_value }
+                                } catch (e) {
+                                  payload = { timeSpentFormatted: h.new_value }
+                                }
+                                const isAuthorOrManager = data?.isManager || (data?.currentUserId && data.currentUserId === h.actor_id)
+                                return (
+                                  <div className="space-y-1.5 p-2.5 bg-[#FAFBFC] border border-[#DFE1E6] rounded-[3px]">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#DEEBFF] text-[#0052CC] font-mono font-bold text-xs">
+                                          <Clock className="w-3 h-3" />
+                                          <span>Logged {payload.timeSpentFormatted}</span>
+                                        </span>
+                                        {payload.remainingFormatted && (
+                                          <span className="text-[11px] text-[#5E6C84]">
+                                            Remaining: <strong className="text-[#172B4D]">{payload.remainingFormatted}</strong>
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      {isAuthorOrManager && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteWorklog(h.id)}
+                                          className="text-[#5E6C84] hover:text-[#DE350B] p-1 rounded transition-colors text-[11px] cursor-pointer"
+                                          title="Delete work log entry"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
+                                      )}
+                                    </div>
+                                    {payload.description && (
+                                      <p className="text-xs text-[#172B4D] leading-relaxed pt-0.5 whitespace-pre-wrap">
+                                        {payload.description}
+                                      </p>
+                                    )}
+                                  </div>
+                                )
+                              })()
+                            ) : h.action_type === 'estimate_updated' ? (
+                              (() => {
+                                let payload: any = {}
+                                try {
+                                  payload = typeof h.new_value === 'string' && h.new_value.startsWith('{')
+                                    ? JSON.parse(h.new_value)
+                                    : { estimateFormatted: h.new_value }
+                                } catch (e) {
+                                  payload = { estimateFormatted: h.new_value }
+                                }
+                                return (
+                                  <p className="text-[#5E6C84] flex items-center gap-1.5">
+                                    <Clock className="w-3 h-3 text-[#0052CC]" />
+                                    <span>updated original estimate to</span>
+                                    <span className="font-semibold text-[#172B4D] font-mono bg-[#EBECF0] px-1 py-0.5 rounded">
+                                      {payload.estimateFormatted || h.new_value || 'None'}
+                                    </span>
+                                  </p>
+                                )
+                              })()
                             ) : h.action_type?.startsWith('updated_') ? (
                               <p className="text-[#5E6C84]">
                                 updated <span className="font-semibold text-[#172B4D] capitalize">{h.action_type.replace('updated_', '').replace('_', ' ')}</span> from <span className="line-through text-[#5E6C84]">{h.old_value || 'None'}</span> to <span className="font-semibold text-[#172B4D]">{h.new_value || 'None'}</span>
@@ -671,6 +772,18 @@ export default function TaskDetailModal({ taskId, onClose, onTaskUpdated }: Task
                   </div>
                 </div>
 
+                {/* Time Tracking Section */}
+                <div className="pt-3 border-t border-[#DFE1E6] space-y-2">
+                  <h5 className="text-[11px] font-bold text-[#5E6C84] uppercase tracking-wider">
+                    Time Tracking
+                  </h5>
+                  <TimeTrackingProgress
+                    summary={timeSummary}
+                    onOpenLogWork={() => setLogWorkOpen(true)}
+                    onOpenEstimate={() => setEstimateModalOpen(true)}
+                  />
+                </div>
+
                 {/* Project Info */}
                 <div className="pt-2 border-t border-[#DFE1E6] space-y-1 text-xs">
                   <span className="text-[11px] font-semibold text-[#5E6C84]">Project</span>
@@ -684,6 +797,36 @@ export default function TaskDetailModal({ taskId, onClose, onTaskUpdated }: Task
             </div>
 
           </div>
+        )}
+
+        {/* Time Tracking Modals */}
+        {data?.task && (
+          <>
+            <LogWorkModal
+              open={logWorkOpen}
+              onOpenChange={setLogWorkOpen}
+              taskId={data.task.id}
+              issueKey={issueKey}
+              taskTitle={data.task.title}
+              currentSummary={timeSummary}
+              onWorkLogged={() => {
+                showSuccess('Work logged to issue timeline')
+                loadData()
+              }}
+            />
+            <SetEstimateModal
+              open={estimateModalOpen}
+              onOpenChange={setEstimateModalOpen}
+              taskId={data.task.id}
+              issueKey={issueKey}
+              taskTitle={data.task.title}
+              currentEstimateFormatted={timeSummary.originalEstimateFormatted}
+              onEstimateSaved={() => {
+                showSuccess('Original estimate updated')
+                loadData()
+              }}
+            />
+          </>
         )}
       </DialogContent>
     </Dialog>
