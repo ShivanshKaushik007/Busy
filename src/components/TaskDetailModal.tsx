@@ -14,7 +14,8 @@ import {
   History,
   Calendar,
   Layers,
-  ChevronDown
+  ChevronDown,
+  AtSign
 } from 'lucide-react'
 import {
   Dialog,
@@ -36,6 +37,8 @@ import BusyLozenge from '@/components/busy/BusyLozenge'
 import BusyPriorityIcon from '@/components/busy/BusyPriorityIcon'
 import BusyIssueTypeIcon from '@/components/busy/BusyIssueTypeIcon'
 import BusyAvatar from '@/components/busy/BusyAvatar'
+import MentionTextarea from '@/components/busy/MentionTextarea'
+import CommentRenderer, { containsAnyMention, containsUserMention } from '@/components/busy/CommentRenderer'
 import { formatDateTime } from '@/lib/dateUtils'
 
 interface TaskDetailModalProps {
@@ -65,7 +68,7 @@ export default function TaskDetailModal({ taskId, onClose, onTaskUpdated }: Task
   const [commentText, setCommentText] = useState('')
   const [submittingComment, setSubmittingComment] = useState(false)
   const [savingDetails, setSavingDetails] = useState(false)
-  const [activityTab, setActivityTab] = useState<'all' | 'comments' | 'history'>('all')
+  const [activityTab, setActivityTab] = useState<'all' | 'comments' | 'mentions' | 'history'>('all')
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false)
 
   const loadData = async () => {
@@ -148,8 +151,8 @@ export default function TaskDetailModal({ taskId, onClose, onTaskUpdated }: Task
   }
 
   // Handle new comment
-  const handleAddComment = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleAddComment = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
     if (!commentText.trim() || !data?.task) return
     setSubmittingComment(true)
     setError(null)
@@ -201,6 +204,7 @@ export default function TaskDetailModal({ taskId, onClose, onTaskUpdated }: Task
   // Filter history based on activity tab
   const historyItems = (data?.history || []).filter((h: any) => {
     if (activityTab === 'comments') return h.action_type === 'comment'
+    if (activityTab === 'mentions') return h.action_type === 'comment' && containsAnyMention(h.new_value || '')
     if (activityTab === 'history') return h.action_type !== 'comment'
     return true
   })
@@ -366,6 +370,17 @@ export default function TaskDetailModal({ taskId, onClose, onTaskUpdated }: Task
                       Comments
                     </button>
                     <button
+                      onClick={() => setActivityTab('mentions')}
+                      className={`px-2 py-0.5 rounded-[3px] font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                        activityTab === 'mentions' 
+                          ? 'bg-[#EBECF0] text-[#172B4D] font-semibold' 
+                          : 'text-[#5E6C84] hover:bg-[#FAFBFC]'
+                      }`}
+                    >
+                      <AtSign className="w-3 h-3 text-[#0052CC]" />
+                      <span>Mentions</span>
+                    </button>
+                    <button
                       onClick={() => setActivityTab('history')}
                       className={`px-2 py-0.5 rounded-[3px] font-medium transition-colors cursor-pointer ${
                         activityTab === 'history' 
@@ -380,31 +395,43 @@ export default function TaskDetailModal({ taskId, onClose, onTaskUpdated }: Task
 
                 {/* Jira Add Comment Box */}
                 <form onSubmit={handleAddComment} className="space-y-2 bg-[#FAFBFC] p-3 rounded-[3px] border border-[#DFE1E6]">
-                  <textarea 
-                    placeholder="Add a comment or progress update..."
+                  <MentionTextarea 
                     value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
+                    onChange={setCommentText}
+                    placeholder="Add a comment... (type @ to mention a teammate)"
+                    members={data?.allWorkspaceMembers || []}
+                    projectMembers={data?.projectMembers || []}
+                    disabled={submittingComment}
                     rows={2}
-                    className="w-full p-2 text-xs text-[#172B4D] bg-white border border-[#DFE1E6] focus:border-[#0052CC] focus:ring-1 focus:ring-[#0052CC] rounded-[3px] outline-none transition-all"
+                    onSubmit={handleAddComment}
                   />
-                  <div className="flex justify-end gap-2">
-                    {commentText.trim() && (
-                      <button
-                        type="button"
-                        onClick={() => setCommentText('')}
-                        className="text-xs text-[#5E6C84] hover:text-[#172B4D] px-2 py-1 cursor-pointer"
+                  <div className="flex justify-between items-center pt-1">
+                    <div className="text-[11px] text-[#5E6C84] flex items-center gap-1">
+                      <span>Tip: type</span>
+                      <kbd className="px-1 py-0.5 bg-[#EBECF0] text-[#172B4D] text-[10px] rounded border border-[#DFE1E6] font-mono">@</kbd>
+                      <span>to mention or</span>
+                      <kbd className="px-1 py-0.5 bg-[#EBECF0] text-[#172B4D] text-[10px] rounded border border-[#DFE1E6] font-mono">Ctrl+Enter</kbd>
+                      <span>to save</span>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      {commentText.trim() && (
+                        <button
+                          type="button"
+                          onClick={() => setCommentText('')}
+                          className="text-xs text-[#5E6C84] hover:text-[#172B4D] px-2 py-1 cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                      <button 
+                        type="submit" 
+                        disabled={submittingComment || !commentText.trim()}
+                        className="bg-[#0052CC] hover:bg-[#0747A6] active:bg-[#0047B3] text-white font-medium text-xs px-3 py-1 rounded-[3px] shadow-2xs transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
                       >
-                        Cancel
+                        <MessageSquare className="w-3 h-3" />
+                        <span>{submittingComment ? 'Saving...' : 'Save'}</span>
                       </button>
-                    )}
-                    <button 
-                      type="submit" 
-                      disabled={submittingComment || !commentText.trim()}
-                      className="bg-[#0052CC] hover:bg-[#0747A6] active:bg-[#0047B3] text-white font-medium text-xs px-3 py-1 rounded-[3px] shadow-2xs transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                    >
-                      <MessageSquare className="w-3 h-3" />
-                      <span>{submittingComment ? 'Saving...' : 'Save'}</span>
-                    </button>
+                    </div>
                   </div>
                 </form>
 
@@ -434,8 +461,24 @@ export default function TaskDetailModal({ taskId, onClose, onTaskUpdated }: Task
                             </div>
 
                             {h.action_type === 'comment' ? (
-                              <div className="p-2.5 bg-[#FAFBFC] rounded-[3px] text-[#172B4D] text-xs border border-[#DFE1E6] leading-relaxed">
-                                {h.new_value}
+                              <div className="space-y-1">
+                                {containsUserMention(h.new_value, data?.currentUserId) && (
+                                  <div className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold text-[#0052CC] bg-[#DEEBFF] border border-[#B3D4FF] rounded-[3px]">
+                                    <AtSign className="w-2.5 h-2.5" />
+                                    <span>Mentioned you</span>
+                                  </div>
+                                )}
+                                <div className={`p-2.5 rounded-[3px] text-[#172B4D] text-xs border leading-relaxed ${
+                                  containsUserMention(h.new_value, data?.currentUserId)
+                                    ? 'bg-[#F4F8FF] border-[#B3D4FF]'
+                                    : 'bg-[#FAFBFC] border-[#DFE1E6]'
+                                }`}>
+                                  <CommentRenderer 
+                                    content={h.new_value}
+                                    currentUserId={data?.currentUserId}
+                                    members={data?.allWorkspaceMembers || []}
+                                  />
+                                </div>
                               </div>
                             ) : h.action_type === 'status_change' ? (
                               <div className="text-[#5E6C84] flex items-center gap-1.5 flex-wrap">

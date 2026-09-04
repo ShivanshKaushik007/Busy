@@ -147,16 +147,8 @@ export default function CreateTaskDialog({
 
   return (
     <>
-      {trigger ? (
+      {trigger && (
         <span onClick={() => setIsOpen(true)}>{trigger}</span>
-      ) : (
-        <button 
-          onClick={() => setIsOpen(true)}
-          className="bg-[#0052CC] hover:bg-[#0747A6] active:bg-[#0047B3] text-white font-medium text-xs px-3 py-1.5 rounded-[3px] shadow-2xs transition-colors flex items-center gap-1 cursor-pointer"
-        >
-          <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-          <span>Create</span>
-        </button>
       )}
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>

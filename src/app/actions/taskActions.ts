@@ -108,11 +108,21 @@ export async function getTaskDetail(taskId: string) {
     .eq('project_id', task.project_id)
     .neq('id', taskId)
 
+  const { data: { user } } = await supabase.auth.getUser()
+
+  // 5. All workspace profiles for mention autocomplete
+  const { data: allProfiles } = await supabase
+    .from('profiles')
+    .select('id, full_name, email, role')
+    .order('full_name')
+
   return {
     task,
     history: history || [],
     isManager,
+    currentUserId: user?.id,
     projectMembers: (projectMembers || []).map((m: any) => m.profiles),
+    allWorkspaceMembers: allProfiles || [],
     availableBlockers: projectTasks || []
   }
 }
