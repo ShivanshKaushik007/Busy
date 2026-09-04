@@ -262,6 +262,7 @@ export async function createTask(data: {
 
   revalidatePath('/', 'layout')
   revalidatePath('/tasks')
+  revalidatePath('/board')
   return { success: true, task }
 }
 

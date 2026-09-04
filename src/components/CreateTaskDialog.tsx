@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Plus, Loader2, AlertCircle, Lock, Calendar } from 'lucide-react'
 import {
   Dialog,
@@ -28,6 +29,7 @@ export default function CreateTaskDialog({
   trigger,
   defaultProjectId
 }: CreateTaskDialogProps) {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const isControlled = controlledOpen !== undefined
   const isOpen = isControlled ? controlledOpen : open
@@ -61,8 +63,10 @@ export default function CreateTaskDialog({
       setError(null)
       getUserProjects().then(projs => {
         setProjects(projs)
-        if (!selectedProjectId && projs.length > 0) {
-          setSelectedProjectId(defaultProjectId || projs[0].id)
+        if (defaultProjectId && projs.some(p => p.id === defaultProjectId)) {
+          setSelectedProjectId(defaultProjectId)
+        } else if (!selectedProjectId && projs.length > 0) {
+          setSelectedProjectId(projs[0].id)
         }
       })
     }
@@ -97,29 +101,35 @@ export default function CreateTaskDialog({
     setLoading(true)
     setError(null)
 
-    const res = await createTask({
-      projectId: selectedProjectId,
-      title: title.trim(),
-      description: description.trim() || undefined,
-      priority,
-      dueDate: dueDate || null,
-      assignedUserIds: selectedAssignees,
-      blockingTaskIds: selectedBlockers
-    })
+    try {
+      const res = await createTask({
+        projectId: selectedProjectId,
+        title: title.trim(),
+        description: description.trim() || undefined,
+        priority,
+        dueDate: dueDate || null,
+        assignedUserIds: selectedAssignees,
+        blockingTaskIds: selectedBlockers
+      })
 
-    setLoading(false)
+      setLoading(false)
 
-    if (res.error) {
-      setError(res.error)
-    } else {
-      // Reset
-      setTitle('')
-      setDescription('')
-      setPriority('Medium')
-      setDueDate('')
-      setSelectedAssignees([])
-      setSelectedBlockers([])
-      setIsOpen(false)
+      if (res?.error) {
+        setError(res.error)
+      } else {
+        // Reset
+        setTitle('')
+        setDescription('')
+        setPriority('Medium')
+        setDueDate('')
+        setSelectedAssignees([])
+        setSelectedBlockers([])
+        setIsOpen(false)
+        router.refresh()
+      }
+    } catch (err: any) {
+      setLoading(false)
+      setError(err?.message || 'Failed to create task.')
     }
   }
 
@@ -163,15 +173,15 @@ export default function CreateTaskDialog({
             </DialogHeader>
           </div>
 
-          <div className="p-6 overflow-y-auto flex-1">
-            {error && (
-              <div className="p-2.5 mb-4 text-xs text-[#DE350B] bg-[#FFEBE6] border border-[#FFBDAD] rounded-[3px] flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0 text-[#DE350B]" />
-                <span className="font-medium">{error}</span>
-              </div>
-            )}
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+            <div className="p-6 overflow-y-auto flex-1 space-y-4 text-xs text-[#172B4D]">
+              {error && (
+                <div className="p-2.5 mb-2 text-xs text-[#DE350B] bg-[#FFEBE6] border border-[#FFBDAD] rounded-[3px] flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-[#DE350B]" />
+                  <span className="font-medium">{error}</span>
+                </div>
+              )}
 
-            <form id="busy-create-issue-form" onSubmit={handleSubmit} className="space-y-4 text-xs text-[#172B4D]">
               {/* Project Selector */}
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-[#5E6C84] uppercase tracking-wider">
@@ -312,27 +322,26 @@ export default function CreateTaskDialog({
                   </div>
                 )}
               </div>
-            </form>
-          </div>
+            </div>
 
-          <div className="px-6 py-3 border-t border-[#DFE1E6] bg-[#FAFBFC] flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setIsOpen(false)}
-              className="px-3 py-1.5 text-xs font-medium text-[#42526E] hover:text-[#172B4D] hover:bg-[#EBECF0] rounded-[3px] transition-colors cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              form="jira-create-issue-form"
-              disabled={loading || !title.trim()}
-              className="bg-[#0052CC] hover:bg-[#0747A6] active:bg-[#0047B3] text-white font-medium text-xs px-3.5 py-1.5 rounded-[3px] shadow-2xs transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
-            >
-              {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              <span>{loading ? 'Creating...' : 'Create'}</span>
-            </button>
-          </div>
+            <div className="px-6 py-3 border-t border-[#DFE1E6] bg-[#FAFBFC] flex items-center justify-end gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="px-3 py-1.5 text-xs font-medium text-[#42526E] hover:text-[#172B4D] hover:bg-[#EBECF0] rounded-[3px] transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading || !title.trim()}
+                className="bg-[#0052CC] hover:bg-[#0747A6] active:bg-[#0047B3] text-white font-medium text-xs px-3.5 py-1.5 rounded-[3px] shadow-2xs transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+              >
+                {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>{loading ? 'Creating...' : 'Create'}</span>
+              </button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </>
