@@ -5,11 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { 
   Search, 
-  HelpCircle, 
-  Settings, 
-  ChevronDown, 
-  Plus, 
-  Grid
+  Plus 
 } from 'lucide-react'
 import { logout } from '@/app/login/actions'
 import OverdueAlerts, { OverdueAlert } from '@/components/OverdueAlerts'
@@ -41,16 +37,8 @@ export default function BusyTopNav({
 
   return (
     <header className="h-[52px] bg-white border-b border-[#DFE1E6] flex items-center justify-between px-3 z-30 shrink-0 select-none shadow-2xs">
-      {/* LEFT SECTION: App Switcher + Logo + Nav items + Create Button */}
+      {/* LEFT SECTION: Logo + Nav items + Create Button */}
       <div className="flex items-center gap-2 md:gap-4 h-full">
-        {/* App Switcher */}
-        <button 
-          className="p-1.5 rounded-[3px] text-[#42526E] hover:bg-[#EBECF0] hover:text-[#172B4D] transition-colors cursor-pointer"
-          title="Busy products"
-        >
-          <Grid className="w-4 h-4" />
-        </button>
-
         {/* Busy Brand Logo */}
         <Link href="/" className="flex items-center gap-2 group mr-1">
           <div className="w-6 h-6 rounded-[3px] bg-[#0052CC] flex items-center justify-center text-white shadow-2xs group-hover:bg-[#0747A6] transition-colors">
@@ -68,46 +56,41 @@ export default function BusyTopNav({
           </span>
         </Link>
 
-        {/* Top Dropdown Nav Menus */}
-        <nav className="hidden md:flex items-center space-x-0.5 h-full text-[13px] font-medium text-[#42526E]">
+        {/* Top Nav Menus */}
+        <nav className="hidden md:flex items-center space-x-1 h-full text-[13px] font-medium text-[#42526E]">
           <Link
             href="/"
-            className="flex items-center gap-1 px-2.5 py-1 rounded-[3px] hover:bg-[#EBECF0] hover:text-[#172B4D] transition-colors"
+            className="px-2.5 py-1.5 rounded-[3px] hover:bg-[#EBECF0] hover:text-[#172B4D] transition-colors"
           >
-            <span>Your work</span>
-            <ChevronDown className="w-3.5 h-3.5 opacity-60" />
+            Your work
           </Link>
 
           <Link
             href="/projects"
-            className="flex items-center gap-1 px-2.5 py-1 rounded-[3px] hover:bg-[#EBECF0] hover:text-[#172B4D] transition-colors"
+            className="px-2.5 py-1.5 rounded-[3px] hover:bg-[#EBECF0] hover:text-[#172B4D] transition-colors"
           >
-            <span>Projects</span>
-            <ChevronDown className="w-3.5 h-3.5 opacity-60" />
+            Projects
           </Link>
 
           <Link
             href="/tasks"
-            className="flex items-center gap-1 px-2.5 py-1 rounded-[3px] hover:bg-[#EBECF0] hover:text-[#172B4D] transition-colors"
+            className="px-2.5 py-1.5 rounded-[3px] hover:bg-[#EBECF0] hover:text-[#172B4D] transition-colors"
           >
-            <span>Filters</span>
-            <ChevronDown className="w-3.5 h-3.5 opacity-60" />
+            Filters
           </Link>
 
           <Link
             href="/"
-            className="flex items-center gap-1 px-2.5 py-1 rounded-[3px] hover:bg-[#EBECF0] hover:text-[#172B4D] transition-colors"
+            className="px-2.5 py-1.5 rounded-[3px] hover:bg-[#EBECF0] hover:text-[#172B4D] transition-colors"
           >
-            <span>Dashboards</span>
-            <ChevronDown className="w-3.5 h-3.5 opacity-60" />
+            Dashboards
           </Link>
 
           <Link
             href="/projects"
-            className="flex items-center gap-1 px-2.5 py-1 rounded-[3px] hover:bg-[#EBECF0] hover:text-[#172B4D] transition-colors"
+            className="px-2.5 py-1.5 rounded-[3px] hover:bg-[#EBECF0] hover:text-[#172B4D] transition-colors"
           >
-            <span>Teams</span>
-            <ChevronDown className="w-3.5 h-3.5 opacity-60" />
+            Teams
           </Link>
         </nav>
 
@@ -144,20 +127,7 @@ export default function BusyTopNav({
         {/* Overdue Alerts */}
         <OverdueAlerts initialAlerts={alerts} />
 
-        {/* Settings & Help */}
-        <button 
-          className="p-1.5 rounded-full text-[#42526E] hover:bg-[#EBECF0] hover:text-[#172B4D] transition-colors cursor-pointer"
-          title="Settings"
-        >
-          <Settings className="w-4 h-4" />
-        </button>
 
-        <button 
-          className="p-1.5 rounded-full text-[#42526E] hover:bg-[#EBECF0] hover:text-[#172B4D] transition-colors cursor-pointer"
-          title="Help & Guidelines"
-        >
-          <HelpCircle className="w-4 h-4" />
-        </button>
 
         {/* User Avatar with Sign Out */}
         <form action={logout} className="flex items-center">
