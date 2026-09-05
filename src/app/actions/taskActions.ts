@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { TaskPriority, TaskStatus } from '@/lib/types'
 import { verifyManagerRole } from './projectActions'
+import { addDependencyWithCycleCheck, removeDependency } from './dependencyActions'
 
 // 0. Fetch projects available to the current user
 // "Archiving hides a project from the default views without destroying its data or its tasks."
@@ -568,69 +569,11 @@ export async function toggleTaskAssignment(taskId: string, userId: string, assig
   return { success: true }
 }
 
-// 7. Add & Remove Dependencies
+// 7. Add & Remove Dependencies (with full cycle detection across chains)
 export async function addTaskDependency(taskId: string, blockerTaskId: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (taskId === blockerTaskId) {
-    return { error: 'A task cannot block itself.' }
-  }
-
-  // Check both tasks exist and are in the same project
-  const { data: t1 } = await supabase.from('tasks').select('project_id, title').eq('id', taskId).single()
-  const { data: t2 } = await supabase.from('tasks').select('project_id, title').eq('id', blockerTaskId).single()
-
-  if (!t1 || !t2) return { error: 'Task not found' }
-  if (t1.project_id !== t2.project_id) {
-    return { error: 'Tasks must be in the same project to create a blocking relationship.' }
-  }
-
-  const { error } = await supabase.from('task_dependencies').upsert({
-    task_id: taskId,
-    blocks_task_id: blockerTaskId
-  })
-
-  if (error) return { error: error.message }
-
-  if (user) {
-    await supabase.from('task_history').insert({
-      task_id: taskId,
-      actor_id: user.id,
-      action_type: 'dependency_added',
-      old_value: null,
-      new_value: `Added blocker: "${t2.title}"`
-    })
-  }
-
-  revalidatePath('/', 'layout')
-  revalidatePath('/tasks')
-  return { success: true }
+  return addDependencyWithCycleCheck(taskId, blockerTaskId)
 }
 
 export async function removeTaskDependency(taskId: string, blockerTaskId: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  const { error } = await supabase
-    .from('task_dependencies')
-    .delete()
-    .eq('task_id', taskId)
-    .eq('blocks_task_id', blockerTaskId)
-
-  if (error) return { error: error.message }
-
-  if (user) {
-    await supabase.from('task_history').insert({
-      task_id: taskId,
-      actor_id: user.id,
-      action_type: 'dependency_removed',
-      old_value: blockerTaskId,
-      new_value: null
-    })
-  }
-
-  revalidatePath('/', 'layout')
-  revalidatePath('/tasks')
-  return { success: true }
+  return removeDependency(taskId, blockerTaskId)
 }

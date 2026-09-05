@@ -7,12 +7,14 @@ import CommandPalette from './CommandPalette'
 import SequenceIndicator from './SequenceIndicator'
 import CreateTaskDialog from '@/components/CreateTaskDialog'
 import EmailDigestModal from '@/components/busy/EmailDigestModal'
+import ProjectDependencyAuditModal from '@/components/busy/ProjectDependencyAuditModal'
 
 interface KeyboardShortcutsContextType {
   openCreateTask: () => void
   openShortcutsModal: () => void
   openCommandPalette: () => void
   openEmailDigest: () => void
+  openDependencyAudit: () => void
 }
 
 const KeyboardShortcutsContext = createContext<KeyboardShortcutsContextType | null>(null)
@@ -35,6 +37,7 @@ export default function KeyboardShortcutsProvider({
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [createTaskOpen, setCreateTaskOpen] = useState(false)
   const [emailDigestOpen, setEmailDigestOpen] = useState(false)
+  const [dependencyAuditOpen, setDependencyAuditOpen] = useState(false)
   const [pendingSequence, setPendingSequence] = useState<string | null>(null)
   const sequenceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -126,6 +129,11 @@ export default function KeyboardShortcutsProvider({
           setEmailDigestOpen(true)
           return
         }
+        if (key === 'c') {
+          e.preventDefault()
+          setDependencyAuditOpen(true)
+          return
+        }
       }
 
       // Single-key global shortcuts
@@ -173,7 +181,8 @@ export default function KeyboardShortcutsProvider({
     openCreateTask: () => setCreateTaskOpen(true),
     openShortcutsModal: () => setShortcutsOpen(true),
     openCommandPalette: () => setCommandPaletteOpen(true),
-    openEmailDigest: () => setEmailDigestOpen(true)
+    openEmailDigest: () => setEmailDigestOpen(true),
+    openDependencyAudit: () => setDependencyAuditOpen(true)
   }
 
   return (
@@ -196,6 +205,7 @@ export default function KeyboardShortcutsProvider({
         onOpenCreateTask={() => setCreateTaskOpen(true)}
         onOpenShortcuts={() => setShortcutsOpen(true)}
         onOpenEmailDigest={() => setEmailDigestOpen(true)}
+        onOpenDependencyAudit={() => setDependencyAuditOpen(true)}
       />
 
       {/* Globally Accessible Create Task Dialog (Controlled) */}
@@ -208,6 +218,12 @@ export default function KeyboardShortcutsProvider({
       <EmailDigestModal
         open={emailDigestOpen}
         onOpenChange={setEmailDigestOpen}
+      />
+
+      {/* Project Dependency Graph & Multi-Hop Cycle Auditor Modal */}
+      <ProjectDependencyAuditModal
+        open={dependencyAuditOpen}
+        onOpenChange={setDependencyAuditOpen}
       />
     </KeyboardShortcutsContext.Provider>
   )

@@ -15,10 +15,12 @@ import {
   Filter,
   X,
   GripVertical,
-  Keyboard
+  Keyboard,
+  GitFork
 } from 'lucide-react'
 import TaskDetailModal from '@/components/TaskDetailModal'
 import CreateTaskDialog from '@/components/CreateTaskDialog'
+import ProjectDependencyAuditModal from '@/components/busy/ProjectDependencyAuditModal'
 import BusyLozenge from '@/components/busy/BusyLozenge'
 import BusyPriorityIcon from '@/components/busy/BusyPriorityIcon'
 import BusyIssueTypeIcon from '@/components/busy/BusyIssueTypeIcon'
@@ -71,6 +73,7 @@ export default function BoardClient({
   const [recentOnly, setRecentOnly] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [createColumnStatus, setCreateColumnStatus] = useState<TaskStatus | null>(null)
+  const [dependencyAuditOpen, setDependencyAuditOpen] = useState(false)
 
   // Drag-and-Drop state
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
@@ -476,6 +479,16 @@ export default function BoardClient({
           <div className="flex items-center gap-2">
             <button
               type="button"
+              onClick={() => setDependencyAuditOpen(true)}
+              title="Audit Project Dependencies & Multi-Hop Cycles (g c)"
+              className="bg-white hover:bg-[#EBECF0] text-[#42526E] border border-[#DFE1E6] font-medium text-xs px-2.5 py-1.5 rounded-[3px] shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <GitFork className="w-3.5 h-3.5 text-[#0052CC]" />
+              <span className="hidden sm:inline">Dependency Graph</span>
+            </button>
+
+            <button
+              type="button"
               onClick={openShortcutsModal}
               title="View board keyboard shortcuts (?)"
               className="bg-white hover:bg-[#EBECF0] text-[#42526E] border border-[#DFE1E6] font-medium text-xs px-2.5 py-1.5 rounded-[3px] shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
@@ -847,6 +860,15 @@ export default function BoardClient({
         taskId={activeTaskId} 
         onClose={() => setActiveTaskId(null)} 
         onTaskUpdated={() => router.refresh()} 
+      />
+
+      {/* Project-wide Dependency Graph & Cycle Audit Modal */}
+      <ProjectDependencyAuditModal
+        open={dependencyAuditOpen}
+        onOpenChange={setDependencyAuditOpen}
+        projectId={selectedProject || (projects[0]?.id ?? '')}
+        projectName={activeProjectData ? activeProjectData.name : (projects[0]?.name ?? 'All Projects')}
+        projects={projects}
       />
     </div>
   )

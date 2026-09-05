@@ -21,7 +21,8 @@ import {
   Sparkles,
   X,
   Activity,
-  Mail
+  Mail,
+  GitFork
 } from 'lucide-react'
 
 interface PaletteItem {
@@ -40,6 +41,7 @@ interface CommandPaletteProps {
   onOpenCreateTask: () => void
   onOpenShortcuts: () => void
   onOpenEmailDigest?: () => void
+  onOpenDependencyAudit?: () => void
 }
 
 export default function CommandPalette({
@@ -47,7 +49,8 @@ export default function CommandPalette({
   onOpenChange,
   onOpenCreateTask,
   onOpenShortcuts,
-  onOpenEmailDigest
+  onOpenEmailDigest,
+  onOpenDependencyAudit
 }: CommandPaletteProps) {
   const router = useRouter()
   const [query, setQuery] = useState('')
@@ -132,6 +135,18 @@ export default function CommandPalette({
         onOpenEmailDigest?.()
       }
     },
+    {
+      id: 'nav-dependency-graph',
+      title: 'Dependency Graph & Cycle Auditor',
+      subtitle: 'Inspect DAG structure, multi-hop circular deadlocks & critical paths',
+      category: 'Navigation',
+      icon: GitFork,
+      shortcut: ['g', 'c'],
+      onSelect: () => {
+        onOpenChange(false)
+        onOpenDependencyAudit?.()
+      }
+    },
 
     // Actions
     {
@@ -142,6 +157,17 @@ export default function CommandPalette({
       icon: Plus,
       shortcut: ['c'],
       onSelect: () => onOpenCreateTask()
+    },
+    {
+      id: 'action-dependency-audit',
+      title: 'Audit Project Dependencies & Cycles',
+      subtitle: 'Run topological DAG analysis and cycle detection across chains',
+      category: 'Actions',
+      icon: GitFork,
+      onSelect: () => {
+        onOpenChange(false)
+        onOpenDependencyAudit?.()
+      }
     },
     {
       id: 'action-email-digest',

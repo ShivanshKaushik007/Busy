@@ -44,6 +44,7 @@ import CommentRenderer, { containsAnyMention, containsUserMention } from '@/comp
 import TimeTrackingProgress from '@/components/busy/TimeTrackingProgress'
 import LogWorkModal from '@/components/busy/LogWorkModal'
 import SetEstimateModal from '@/components/busy/SetEstimateModal'
+import DependencyChainViewer from '@/components/busy/DependencyChainViewer'
 import { getTimeTrackingSummary } from '@/lib/timeTrackingUtils'
 import { formatDateTime } from '@/lib/dateUtils'
 
@@ -324,45 +325,17 @@ export default function TaskDetailModal({ taskId, onClose, onTaskUpdated }: Task
                 </div>
               </div>
 
-              {/* Linked Issues / Blocked by (Requirement 4 & 9) */}
-              <div className="border-t border-[#DFE1E6] pt-4">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-[11px] font-bold text-[#5E6C84] uppercase tracking-wider">
-                    Blocked By ({task?.task_dependencies?.length || 0})
-                  </h4>
-                  <span className="text-[11px] text-[#5E6C84]">
-                    Must be Done before completing this issue
-                  </span>
+              {/* Linked Issues & Dependency Chains with Cycle Detection */}
+              {task && (
+                <div className="border-t border-[#DFE1E6] pt-4">
+                  <DependencyChainViewer
+                    taskId={task.id}
+                    taskTitle={task.title}
+                    projectId={task.project_id}
+                    onDependenciesChanged={loadData}
+                  />
                 </div>
-
-                {task?.task_dependencies?.length === 0 ? (
-                  <p className="text-xs text-[#5E6C84] italic bg-[#FAFBFC] p-2.5 rounded-[3px] border border-[#DFE1E6]">
-                    No blocking dependencies on this issue.
-                  </p>
-                ) : (
-                  <div className="space-y-1.5">
-                    {task?.task_dependencies?.map((dep: any) => (
-                      <div 
-                        key={dep.blocks_task_id} 
-                        className="flex items-center justify-between text-xs bg-[#FAFBFC] hover:bg-[#F4F5F7] p-2 rounded-[3px] border border-[#DFE1E6] transition-colors"
-                      >
-                        <div className="flex items-center gap-2 truncate">
-                          <Lock className="w-3.5 h-3.5 text-[#FFAB00] shrink-0" />
-                          <span className="font-medium text-[#172B4D] truncate">{dep.tasks?.title}</span>
-                          <BusyLozenge status={dep.tasks?.status} size="sm" />
-                        </div>
-                        <button 
-                          onClick={() => removeTaskDependency(task.id, dep.blocks_task_id).then(loadData)}
-                          className="text-[#5E6C84] hover:text-[#DE350B] p-1 rounded transition-colors text-[11px] cursor-pointer"
-                          title="Remove blocker"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              )}
 
               {/* Activity Section with Jira Tabs (Comments & Immutable Timeline) */}
               <div className="border-t border-[#DFE1E6] pt-4 space-y-3">
