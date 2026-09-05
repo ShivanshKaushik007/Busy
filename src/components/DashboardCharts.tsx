@@ -11,8 +11,10 @@ import {
   BarChart3,
   TrendingUp,
   Activity,
-  Layers
+  Layers,
+  Mail
 } from 'lucide-react'
+import { useKeyboardShortcuts } from '@/components/keyboard/KeyboardShortcutsProvider'
 import { 
   LineChart, 
   Line, 
@@ -57,6 +59,7 @@ export default function DashboardCharts({
   assigneeData = [] 
 }: DashboardDataProps) {
   const totalTasks = metrics.openTasks + metrics.completedThisWeek || 1
+  const { openEmailDigest } = useKeyboardShortcuts()
 
   return (
     <div className="space-y-6 select-none">
@@ -84,8 +87,17 @@ export default function DashboardCharts({
             </span>
             <AlertCircle className="w-4 h-4 text-[#DE350B]" />
           </div>
-          <div className="mt-2 text-3xl font-bold text-[#DE350B] tracking-tight">
-            {metrics.overdueTasks}
+          <div className="mt-2 text-3xl font-bold text-[#DE350B] tracking-tight flex items-baseline justify-between">
+            <span>{metrics.overdueTasks}</span>
+            <button
+              type="button"
+              onClick={openEmailDigest}
+              className="text-[11px] font-semibold text-[#0052CC] hover:text-[#0747A6] bg-[#DEEBFF] hover:bg-[#B3D4FF] px-2 py-0.5 rounded-[3px] transition-colors flex items-center gap-1 cursor-pointer"
+              title="Open Overdue Email Digest Center"
+            >
+              <Mail className="w-3 h-3" />
+              <span>Email Digest</span>
+            </button>
           </div>
           <p className="text-[11px] text-[#DE350B] mt-1 font-medium">Issues past due date</p>
         </div>

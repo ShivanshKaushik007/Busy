@@ -20,7 +20,8 @@ import {
   ArrowRight,
   Sparkles,
   X,
-  Activity
+  Activity,
+  Mail
 } from 'lucide-react'
 
 interface PaletteItem {
@@ -38,13 +39,15 @@ interface CommandPaletteProps {
   onOpenChange: (open: boolean) => void
   onOpenCreateTask: () => void
   onOpenShortcuts: () => void
+  onOpenEmailDigest?: () => void
 }
 
 export default function CommandPalette({
   open,
   onOpenChange,
   onOpenCreateTask,
-  onOpenShortcuts
+  onOpenShortcuts,
+  onOpenEmailDigest
 }: CommandPaletteProps) {
   const router = useRouter()
   const [query, setQuery] = useState('')
@@ -117,6 +120,18 @@ export default function CommandPalette({
       shortcut: ['g', 'a'],
       onSelect: () => router.push('/activity')
     },
+    {
+      id: 'nav-email-digest',
+      title: 'Overdue Email Digest',
+      subtitle: 'Preview and dispatch responsive HTML digest of past-due work',
+      category: 'Navigation',
+      icon: Mail,
+      shortcut: ['g', 'e'],
+      onSelect: () => {
+        onOpenChange(false)
+        onOpenEmailDigest?.()
+      }
+    },
 
     // Actions
     {
@@ -127,6 +142,17 @@ export default function CommandPalette({
       icon: Plus,
       shortcut: ['c'],
       onSelect: () => onOpenCreateTask()
+    },
+    {
+      id: 'action-email-digest',
+      title: 'Send Overdue Email Digest',
+      subtitle: 'Preview and trigger simulated overdue digest to your mailbox',
+      category: 'Actions',
+      icon: Mail,
+      onSelect: () => {
+        onOpenChange(false)
+        onOpenEmailDigest?.()
+      }
     },
     {
       id: 'action-my-tasks',

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Bell, X, AlertCircle } from 'lucide-react'
+import { Bell, X, AlertCircle, Mail } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { dismissAlert } from '@/app/actions/alertActions'
 import { formatShortDate } from '@/lib/dateUtils'
+import EmailDigestModal from '@/components/busy/EmailDigestModal'
 
 export type OverdueAlert = {
   id: string;
@@ -19,8 +20,15 @@ export type OverdueAlert = {
   due_date: string;
 }
 
-export default function OverdueAlerts({ initialAlerts }: { initialAlerts: OverdueAlert[] }) {
+export default function OverdueAlerts({
+  initialAlerts,
+  userRole = 'member'
+}: {
+  initialAlerts: OverdueAlert[]
+  userRole?: string
+}) {
   const [alerts, setAlerts] = useState(initialAlerts)
+  const [digestOpen, setDigestOpen] = useState(false)
 
   const handleDismiss = async (e: React.MouseEvent, alert: OverdueAlert) => {
     e.preventDefault()
@@ -88,7 +96,29 @@ export default function OverdueAlerts({ initialAlerts }: { initialAlerts: Overdu
             ))}
           </div>
         )}
+
+        <div className="p-2 bg-[#FAFBFC] border-t border-[#DFE1E6]">
+          <button 
+            type="button"
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setDigestOpen(true)
+            }}
+            className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2 text-xs font-semibold text-[#0052CC] hover:bg-[#DEEBFF] rounded-[3px] transition-colors cursor-pointer border border-[#B3D4FF]/40 bg-white"
+          >
+            <Mail className="w-3.5 h-3.5" />
+            <span>📬 Email Digest Preview & Dispatch</span>
+          </button>
+        </div>
       </DropdownMenuContent>
+
+      <EmailDigestModal
+        open={digestOpen}
+        onOpenChange={setDigestOpen}
+        userRole={userRole}
+      />
     </DropdownMenu>
   )
 }
+

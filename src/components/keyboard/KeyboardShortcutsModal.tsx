@@ -39,6 +39,7 @@ const SHORTCUT_CATEGORIES: ShortcutCategory[] = [
       { keys: ['g', 'p'], description: 'Go to Projects list' },
       { keys: ['g', 't'], description: 'Go to Teams & People' },
       { keys: ['g', 'a'], description: 'Go to Activity Feed' },
+      { keys: ['g', 'e'], description: 'Go to Overdue Email Digest' },
     ]
   },
   {

@@ -13,7 +13,8 @@ import {
   Users,
   LogOut,
   Keyboard,
-  Sparkles
+  Sparkles,
+  Mail
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -42,7 +43,7 @@ export default function BusyTopNav({
   const router = useRouter()
   const pathname = usePathname()
   const [searchQuery, setSearchQuery] = useState('')
-  const { openCommandPalette, openShortcutsModal } = useKeyboardShortcuts()
+  const { openCommandPalette, openShortcutsModal, openEmailDigest } = useKeyboardShortcuts()
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -146,7 +147,7 @@ export default function BusyTopNav({
         </form>
 
         {/* Overdue Alerts */}
-        <OverdueAlerts initialAlerts={alerts} />
+        <OverdueAlerts initialAlerts={alerts} userRole={userRole} />
 
 
 
@@ -216,6 +217,21 @@ export default function BusyTopNav({
                 <Users className="w-4 h-4 text-[#5E6C84]" />
                 <span className="font-medium">Teams & People</span>
               </Link>
+
+              <button
+                type="button"
+                onClick={openEmailDigest}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-[3px] hover:bg-[#EBECF0] hover:text-[#0052CC] transition-colors text-left cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Mail className="w-4 h-4 text-[#5E6C84]" />
+                  <span className="font-medium">Overdue Email Digest</span>
+                </div>
+                <div className="flex items-center gap-1 text-[10px] font-mono text-[#5E6C84]">
+                  <kbd className="px-1.5 py-0.5 bg-white border border-[#DFE1E6] rounded text-[10px]">g</kbd>
+                  <kbd className="px-1.5 py-0.5 bg-white border border-[#DFE1E6] rounded text-[10px]">e</kbd>
+                </div>
+              </button>
 
               <button
                 type="button"

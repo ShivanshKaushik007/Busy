@@ -6,11 +6,13 @@ import KeyboardShortcutsModal from './KeyboardShortcutsModal'
 import CommandPalette from './CommandPalette'
 import SequenceIndicator from './SequenceIndicator'
 import CreateTaskDialog from '@/components/CreateTaskDialog'
+import EmailDigestModal from '@/components/busy/EmailDigestModal'
 
 interface KeyboardShortcutsContextType {
   openCreateTask: () => void
   openShortcutsModal: () => void
   openCommandPalette: () => void
+  openEmailDigest: () => void
 }
 
 const KeyboardShortcutsContext = createContext<KeyboardShortcutsContextType | null>(null)
@@ -32,6 +34,7 @@ export default function KeyboardShortcutsProvider({
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [createTaskOpen, setCreateTaskOpen] = useState(false)
+  const [emailDigestOpen, setEmailDigestOpen] = useState(false)
   const [pendingSequence, setPendingSequence] = useState<string | null>(null)
   const sequenceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -118,6 +121,11 @@ export default function KeyboardShortcutsProvider({
           router.push('/activity')
           return
         }
+        if (key === 'e') {
+          e.preventDefault()
+          setEmailDigestOpen(true)
+          return
+        }
       }
 
       // Single-key global shortcuts
@@ -164,7 +172,8 @@ export default function KeyboardShortcutsProvider({
   const contextValue: KeyboardShortcutsContextType = {
     openCreateTask: () => setCreateTaskOpen(true),
     openShortcutsModal: () => setShortcutsOpen(true),
-    openCommandPalette: () => setCommandPaletteOpen(true)
+    openCommandPalette: () => setCommandPaletteOpen(true),
+    openEmailDigest: () => setEmailDigestOpen(true)
   }
 
   return (
@@ -186,6 +195,7 @@ export default function KeyboardShortcutsProvider({
         onOpenChange={setCommandPaletteOpen}
         onOpenCreateTask={() => setCreateTaskOpen(true)}
         onOpenShortcuts={() => setShortcutsOpen(true)}
+        onOpenEmailDigest={() => setEmailDigestOpen(true)}
       />
 
       {/* Globally Accessible Create Task Dialog (Controlled) */}
@@ -193,6 +203,13 @@ export default function KeyboardShortcutsProvider({
         open={createTaskOpen}
         onOpenChange={setCreateTaskOpen}
       />
+
+      {/* Overdue Work Email Digest Center Modal */}
+      <EmailDigestModal
+        open={emailDigestOpen}
+        onOpenChange={setEmailDigestOpen}
+      />
     </KeyboardShortcutsContext.Provider>
   )
 }
+
