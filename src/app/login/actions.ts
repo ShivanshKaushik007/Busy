@@ -17,8 +17,7 @@ export async function login(formData: FormData) {
   const { error } = await supabase.auth.signInWithPassword(data)
 
   if (error) {
-    // Return an error to be handled in the client form (in a real app, maybe redirect with ?error)
-    redirect('/login?error=Could not authenticate user')
+    redirect(`/login?mode=signin&error=${encodeURIComponent(error.message || 'Invalid email or password. Please try again.')}`)
   }
 
   // Revalidate the cache for the home page so it shows fresh data
@@ -49,7 +48,7 @@ export async function signup(formData: FormData) {
   })
 
   if (error) {
-    redirect(`/login?error=${encodeURIComponent(error.message || 'Could not create user')}`)
+    redirect(`/login?mode=signup&error=${encodeURIComponent(error.message || 'Could not create user')}`)
   }
 
   revalidatePath('/', 'layout')
